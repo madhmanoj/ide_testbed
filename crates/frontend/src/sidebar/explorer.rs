@@ -11,6 +11,7 @@ const ICON_SVG_PATH: &str =
      18V6L16 0M20 18H8V2H15V7H20V18M4 4V22H20V24H4C2.9 24 2 23.1 2 22V4H4Z";
 
 fn folder_open_icon() -> Dom {
+    // downward arrow
     const FOLDER_OPEN_ICON: &str = "M2,7 12,17 22,7Z";
     svg!("svg", {
         .attr("pointer-events", "none")
@@ -23,6 +24,7 @@ fn folder_open_icon() -> Dom {
 }
 
 fn folder_closed_icon() -> Dom {
+    // sideways arrow
     const FOLDER_CLOSED_ICON: &str = "M 7,22 17,12 7,2 Z";
     svg!("svg", {
         .attr("pointer-events", "none")
