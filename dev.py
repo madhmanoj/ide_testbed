@@ -155,7 +155,9 @@ driver = None
 try:
     options = selenium.webdriver.ChromeOptions()
     driver = selenium.webdriver.Remote(
-        command_executor='http://127.0.0.1:4444/wd/hub',
+        # it is better to use host.docker.internal it is supported for all OSs, linux from Docker 20
+        # https://stackoverflow.com/questions/48546124/what-is-the-linux-equivalent-of-host-docker-internal
+        command_executor='http://host.docker.internal:4444/wd/hub',
         options=options,
         desired_capabilities=dict())
 except Exception as e:
