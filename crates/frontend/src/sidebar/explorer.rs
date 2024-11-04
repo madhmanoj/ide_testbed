@@ -84,18 +84,19 @@ fn render_contents(
                         .text_signal(directory.name.signal_cloned())
                     }))
                     // event listener for right click
-                    .event(clone!(cms_d=> move |event: events::ContextMenu| {
+                    .event(clone!(cms_d, directory => move |event: events::ContextMenu| {
                         web_sys::console::log_1(&"Right-clicked".into());
                         cms_d.show.set(true);
                         cms_d.position.set((event.x(), event.y()));
                         cms_d.menu_type.set(Some(Menutype::Directory));
+                        cms_d.target_object.set(Some(directory.clone()));
                     }))
                 }))
                 // check for update in show to render context menu
                 // not required since the parent is looking for signal (not very sure of the behavior/need to look in to this)
-                .child_signal(cms_d.show.signal_ref(clone!(cms_d => move |&show| {
-                    show.then_some(ContextMenu::render_menu(cms_d.clone()))
-                })))
+                // .child_signal(cms_d.show.signal_ref(clone!(cms_d => move |&show| {
+                //     show.then_some(ContextMenu::render_menu(cms_d.clone()))
+                // })))
                 .child_signal(expanded.signal_ref(clone!(directory, workspace_command_tx, cms_d => move |expanded| {
                     expanded.then_some(render_contents(&directory, &workspace_command_tx, &cms_d))
                 })))
@@ -135,9 +136,9 @@ fn render_contents(
             }))
             // check for update in show to render context menu
             // not required since the parent is looking for signal (not very sure of the behavior/need to look into this)
-            .child_signal(cms_f.show.signal_ref(clone!(cms_f => move |&show| {
-                show.then_some(ContextMenu::render_menu(cms_f.clone()))
-            })))
+            // .child_signal(cms_f.show.signal_ref(clone!(cms_f => move |&show| {
+            //     show.then_some(ContextMenu::render_menu(cms_f.clone()))
+            // })))
         })));
 
     html!("ul", {
@@ -201,11 +202,12 @@ impl Explorer {
                             .text_signal(this.workspace.name.signal_cloned())
                         }))
                         // event listener for right click
-                        .event(clone!(context_menu_state=> move |event: events::ContextMenu| {
+                        .event(clone!(context_menu_state, this => move |event: events::ContextMenu| {
                             web_sys::console::log_1(&"Right-clicked".into());
                             context_menu_state.show.set(true);
                             context_menu_state.position.set((event.x(), event.y()));
                             context_menu_state.menu_type.set(Some(Menutype::Directory));
+                            context_menu_state.target_object.set(Some(this.workspace.clone()));
                         }))
                     }))
                     // check for update in show to render context menu
