@@ -4,7 +4,7 @@ use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions
 use dominator_bulma::{block, icon, icon_text};
 use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
 
-use crate::{contextmenu::{ContextMenu, Menutype}, vfs::Directory};
+use crate::{contextmenu::{ContextMenu, Target}, vfs::Directory};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -52,15 +52,13 @@ fn file_icon() -> Dom {
 fn render_contents(
     directory: &Rc<Directory>,
     workspace_command_tx: &crate::WorkspaceCommandSender, 
-    context_menu_state: Mutable<Option<ContextMenu>>
+    context_menu: Mutable<Option<ContextMenu>>
 ) -> Dom {
-    // let context_menu_state = context_menu_state.clone();
-    // let context_menu_state = context_menu_state.clone();
     let directories = directory.directories
         .signal_vec_cloned()
         .sort_by_cloned(|left_directory, right_directory|
             left_directory.name.lock_ref().cmp(&*right_directory.name.lock_ref()))
-        .map(clone!(workspace_command_tx, context_menu_state => move |directory| {
+        .map(clone!(workspace_command_tx, context_menu => move |directory| {
             let expanded = Mutable::new(true);
             html!("li", {
                 .class("pl-5")
@@ -84,16 +82,16 @@ fn render_contents(
                         .text_signal(directory.name.signal_cloned())
                     }))
                     // event listener for right click
-                    .event(clone!(context_menu_state, directory => move |event: events::ContextMenu| {
+                    .event(clone!(context_menu, directory => move |event: events::ContextMenu| {
                         web_sys::console::log_1(&"Right-clicked".into());
-                        context_menu_state.set(Some(ContextMenu::new(
+                        context_menu.set(Some(ContextMenu::new(
                             (event.x(), event.y()),
-                            Menutype::Directory(directory.clone()),
+                            Target::Directory(directory.clone()),
                         )));
                     }))
                 }))
-                .child_signal(expanded.signal_ref(clone!(directory, workspace_command_tx, context_menu_state => move |expanded| {
-                    expanded.then_some(render_contents(&directory, &workspace_command_tx, context_menu_state.clone()))
+                .child_signal(expanded.signal_ref(clone!(directory, workspace_command_tx, context_menu => move |expanded| {
+                    expanded.then_some(render_contents(&directory, &workspace_command_tx, context_menu.clone()))
                 })))
             })
         }));
@@ -122,11 +120,11 @@ fn render_contents(
                     .text_signal(file.name.signal_cloned())
                 }))
                 // event listener for right click
-                .event(clone!(context_menu_state => move |event: events::ContextMenu| {
+                .event(clone!(context_menu => move |event: events::ContextMenu| {
                     web_sys::console::log_1(&"Right-clicked".into());
-                    context_menu_state.set(Some(ContextMenu::new(
+                    context_menu.set(Some(ContextMenu::new(
                         (event.x(), event.y()),
-                        Menutype::File(file.clone())
+                        Target::File(file.clone())
                     )));
                 }))
             }))
@@ -140,15 +138,15 @@ fn render_contents(
 
 pub struct Explorer {
     workspace: Rc<Directory>,
-    // context menu Rc
-    context_menu_state: Mutable<Option<ContextMenu>>
+    // context menu
+    context_menu: Mutable<Option<ContextMenu>>
 }
 
 impl Default for Explorer {
     fn default() -> Self {
         Self {
             workspace: crate::PROJECT.with(|workspace| Rc::clone(workspace)),
-            context_menu_state: Mutable::new(None)
+            context_menu: Mutable::new(None)
         }
     }
 }
@@ -194,32 +192,31 @@ impl Explorer {
                         // event listener for right click
                         .event(clone!(this => move |event: events::ContextMenu| {
                             web_sys::console::log_1(&"Right-clicked".into());
-                            this.context_menu_state.set(Some(ContextMenu::new(
+                            this.context_menu.set(Some(ContextMenu::new(
                                 (event.x(), event.y()),
-                                Menutype::Directory(this.workspace.clone()),
+                                Target::Directory(this.workspace.clone()),
                             )));
                         }))
                     }))
                     // check for update in show to render context menu
-                    .child_signal(this.context_menu_state.signal_ref(|menu_state| {
+                    .child_signal(this.context_menu.signal_ref(|menu_state| {
                         menu_state.as_ref().map(|menu| {
-                            match &menu.target_object {
-                                Menutype::Directory(_) => ContextMenu::folder_menu_render(menu),
-                                Menutype::File(_) => ContextMenu::file_menu_render(menu),
+                            match &menu.target {
+                                Target::Directory(_) => ContextMenu::folder_menu_render(menu),
+                                Target::File(_) => ContextMenu::file_menu_render(menu),
                             }
                         })
                     }))
-                    
                     // prevents default chrome context menu for the whole vfs structure
                     .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
                         event.prevent_default();
                     })
                     // global event listener to close context menu
                     .global_event(clone!(this => move |_:events::Click| {
-                        this.context_menu_state.set(None)
+                        this.context_menu.set(None)
                     }))
                     .child_signal(expanded.signal_ref(clone!(this, workspace_command_tx => move |expanded| {
-                        expanded.then_some(render_contents(&this.workspace, &workspace_command_tx, this.context_menu_state.clone()))
+                        expanded.then_some(render_contents(&this.workspace, &workspace_command_tx, this.context_menu.clone()))
                     })))
                 }))
             }))
