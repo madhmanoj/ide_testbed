@@ -1,13 +1,11 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
 use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
-#[allow(dead_code)]
 #[derive(Clone)]
 pub enum Target {
     File(Rc<File>), 
     Directory(Rc<Directory>)
 }
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct ContextMenu {
     // visibility and position of contextmenu
@@ -18,9 +16,9 @@ pub struct ContextMenu {
 
 
 impl ContextMenu {
-    pub fn new(pos: (i32, i32), target: Target) -> Self {
+    pub fn new(position: (i32, i32), target: Target) -> Self {
         Self {
-            position: pos,
+            position,
             target,
         }
     }
