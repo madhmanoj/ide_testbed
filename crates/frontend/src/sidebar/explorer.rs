@@ -4,7 +4,7 @@ use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions
 use dominator_bulma::{block, icon, icon_text};
 use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
 
-use crate::{contextmenu::ContextMenuState, vfs::Directory};
+use crate::{contextmenu::{ContextMenu, Target}, vfs::Directory};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -49,64 +49,16 @@ fn file_icon() -> Dom {
     })
 }
 
-// rendering context menu
-fn render_menu(
-    context_menu_state: Rc<ContextMenuState>
-) -> Dom {
-    html!("div", {
-        .class("context-menu")
-        .style("position", "absolute")
-        .style("background-color", "lightgray")
-        .style("border", "1px solid black")
-        .style("padding", "10px")
-        .style("z-index", "1000")
-        .style_signal("left", context_menu_state.menu_position.signal_ref(|(x, _y)| {
-            format!("{}px", x)
-        }))
-        .style_signal("top", context_menu_state.menu_position.signal_ref(|(_x, y)| {
-            format!("{}px", y)
-        }))
-        .children(&mut [
-            html!("div", {
-                .text("Option 1")
-                .style("cursor", "pointer")
-                .event(clone!(context_menu_state => move |_event: events::MouseDown| {
-                    web_sys::console::log_1(&"Option 1 clicked".into());
-                    context_menu_state.show_menu.set_neq(false); // Hide the menu after clicking
-                }))
-            }),
-            html!("div", {
-                .text("Option 2")
-                .style("cursor", "pointer")
-                .event(clone!(context_menu_state => move |_event: events::MouseDown| {
-                    web_sys::console::log_1(&"Option 2 clicked".into());
-                    context_menu_state.show_menu.set_neq(false); // Hide the menu after clicking
-                }))
-            }),
-            html!("div", {
-                .text("Option 3")
-                .style("cursor", "pointer")
-                .event(clone!(context_menu_state => move |_event: events::MouseDown| {
-                    web_sys::console::log_1(&"Option 3 clicked".into());
-                    context_menu_state.show_menu.set_neq(false); // Hide the menu after clicking
-                }))
-            })
-        ])
-    })
-}
-
 fn render_contents(
     directory: &Rc<Directory>,
-    workspace_command_tx: &crate::WorkspaceCommandSender,
-    context_menu_state: &Rc<ContextMenuState>
+    workspace_command_tx: &crate::WorkspaceCommandSender, 
+    context_menu: Mutable<Option<ContextMenu>>
 ) -> Dom {
-    let cms_d = context_menu_state.clone();
-    let cms_f = context_menu_state.clone();
     let directories = directory.directories
         .signal_vec_cloned()
         .sort_by_cloned(|left_directory, right_directory|
             left_directory.name.lock_ref().cmp(&*right_directory.name.lock_ref()))
-        .map(clone!(workspace_command_tx => move |directory| {
+        .map(clone!(workspace_command_tx, context_menu => move |directory| {
             let expanded = Mutable::new(true);
             html!("li", {
                 .class("pl-5")
@@ -130,23 +82,16 @@ fn render_contents(
                         .text_signal(directory.name.signal_cloned())
                     }))
                     // event listener for right click
-                    .event(clone!(cms_d => move |event: events::ContextMenu| {
+                    .event(clone!(context_menu, directory => move |event: events::ContextMenu| {
                         web_sys::console::log_1(&"Right-clicked".into());
-                        cms_d.show_menu.set_neq(true);
-                        cms_d.menu_position.set_neq((event.x(), event.y()));
+                        context_menu.set(Some(ContextMenu::new(
+                            (event.x(), event.y()),
+                            Target::Directory(directory.clone()),
+                        )));
                     }))
                 }))
-                // check for update in show_menu to render context menu
-                .child_signal(cms_d.show_menu.signal_ref(clone!(cms_d => move |&show| {
-                    if show {
-                        Some(render_menu(cms_d.clone()))
-                    } else {
-                        None
-                    }
-                })))
-                .child_signal(expanded.signal_ref(clone!(directory, workspace_command_tx, cms_d => move |expanded| match expanded {
-                    true => Some(render_contents(&directory, &workspace_command_tx, &cms_d)),
-                    _ => None
+                .child_signal(expanded.signal_ref(clone!(directory, workspace_command_tx, context_menu => move |expanded| {
+                    expanded.then_some(render_contents(&directory, &workspace_command_tx, context_menu.clone()))
                 })))
             })
         }));
@@ -175,20 +120,14 @@ fn render_contents(
                     .text_signal(file.name.signal_cloned())
                 }))
                 // event listener for right click
-                .event(clone!(cms_f => move |event: events::ContextMenu| {
+                .event(clone!(context_menu => move |event: events::ContextMenu| {
                     web_sys::console::log_1(&"Right-clicked".into());
-                    cms_f.show_menu.set_neq(true);
-                    cms_f.menu_position.set_neq((event.x(), event.y()));
+                    context_menu.set(Some(ContextMenu::new(
+                        (event.x(), event.y()),
+                        Target::File(file.clone())
+                    )));
                 }))
             }))
-            // check for update in show_menu to render context menu
-            .child_signal(cms_f.show_menu.signal_ref(clone!(cms_f => move |&show| {
-                if show {
-                    Some(render_menu(cms_f.clone()))
-                } else {
-                    None
-                }
-            })))
         })));
 
     html!("ul", {
@@ -199,15 +138,15 @@ fn render_contents(
 
 pub struct Explorer {
     workspace: Rc<Directory>,
-    // context menu Rc
-    context_menu_state: Rc<ContextMenuState>
+    // context menu
+    context_menu: Mutable<Option<ContextMenu>>
 }
 
 impl Default for Explorer {
     fn default() -> Self {
         Self {
             workspace: crate::PROJECT.with(|workspace| Rc::clone(workspace)),
-            context_menu_state: ContextMenuState::new()
+            context_menu: Mutable::new(None)
         }
     }
 }
@@ -215,7 +154,6 @@ impl Default for Explorer {
 impl Explorer {
     pub fn render(this: &Rc<Explorer>, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
         let expanded = Mutable::new(true);
-        let context_menu_state = this.context_menu_state.clone();
         block!({
             .class("has-background-white-ter")
             .style("height", "100vh")
@@ -252,31 +190,33 @@ impl Explorer {
                             .text_signal(this.workspace.name.signal_cloned())
                         }))
                         // event listener for right click
-                        .event(clone!(context_menu_state => move |event: events::ContextMenu| {
+                        .event(clone!(this => move |event: events::ContextMenu| {
                             web_sys::console::log_1(&"Right-clicked".into());
-                            context_menu_state.show_menu.set_neq(true);
-                            context_menu_state.menu_position.set_neq((event.x(), event.y()));
+                            this.context_menu.set(Some(ContextMenu::new(
+                                (event.x(), event.y()),
+                                Target::Directory(this.workspace.clone()),
+                            )));
                         }))
                     }))
-                    // check for update in show_menu to render context menu
-                    .child_signal(context_menu_state.show_menu.signal_ref(clone!(context_menu_state => move |&show| {
-                        if show {
-                            Some(render_menu(context_menu_state.clone()))
-                        } else {
-                            None
-                        }
-                    })))
+                    // check for update in show to render context menu
+                    .child_signal(this.context_menu.signal_ref(|menu_state| {
+                        menu_state.as_ref().map(|menu| {
+                            match &menu.target {
+                                Target::Directory(_) => ContextMenu::folder_menu_render(menu),
+                                Target::File(_) => ContextMenu::file_menu_render(menu),
+                            }
+                        })
+                    }))
                     // prevents default chrome context menu for the whole vfs structure
                     .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
                         event.prevent_default();
                     })
                     // global event listener to close context menu
-                    .global_event(clone!(context_menu_state => move |_:events::Click| {
-                        context_menu_state.show_menu.set_neq(false);
+                    .global_event(clone!(this => move |_:events::Click| {
+                        this.context_menu.set(None)
                     }))
-                    .child_signal(expanded.signal_ref(clone!(this, workspace_command_tx, context_menu_state => move |expanded| match expanded {
-                        true => Some(render_contents(&this.workspace, &workspace_command_tx, &context_menu_state)),
-                        _ => None
+                    .child_signal(expanded.signal_ref(clone!(this, workspace_command_tx => move |expanded| {
+                        expanded.then_some(render_contents(&this.workspace, &workspace_command_tx, this.context_menu.clone()))
                     })))
                 }))
             }))
