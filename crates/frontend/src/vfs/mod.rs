@@ -7,6 +7,7 @@ pub struct File {
     pub name: Mutable<String>,
     pub mode: Mutable<u32>,
     pub data: Mutable<Vec<u8>>,
+    pub rename: Mutable<bool>
 }
 
 #[derive(Clone)]
@@ -14,6 +15,7 @@ pub struct Directory {
     pub name: Mutable<String>,
     pub mode: Mutable<u32>,
     pub directories: MutableVec<Rc<Directory>>,
-    pub files: MutableVec<Rc<File>>
+    pub files: MutableVec<Rc<File>>,
+    pub rename: Mutable<bool>
 }
 

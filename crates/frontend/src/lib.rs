@@ -2,7 +2,7 @@ use std::{rc::Rc, sync::Arc};
 
 use dominator_bulma::{column, columns};
 use futures::channel::mpsc;
-use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
+use futures_signals::{map_ref, signal::{Mutable, SignalExt}, signal_vec::MutableVec};
 use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use wasm_bindgen::prelude::*;
@@ -116,7 +116,8 @@ thread_local! {
                 vfs::File {
                     name: "launch.xml".to_owned().into(),
                     mode: DEFAULT_FILE_MODE.into(),
-                    data: LAUNCH_XML.as_bytes().to_vec().into()
+                    data: LAUNCH_XML.as_bytes().to_vec().into(),
+                    rename: Mutable::new(false)
                 }.into(),
             ].into(),
             directories: vec![
@@ -128,11 +129,14 @@ thread_local! {
                         vfs::File {
                             name: "run.py".to_owned().into(),
                             mode: DEFAULT_FILE_MODE.into(),
-                            data: VELOCITY_CONTROL_PY.as_bytes().to_vec().into()
+                            data: VELOCITY_CONTROL_PY.as_bytes().to_vec().into(),
+                            rename: Mutable::new(false)
                         }.into(),
-                    ].into()
+                    ].into(),
+                    rename: Mutable::new(false).into()
                 }.into()
             ].into(),
+            rename: Mutable::new(false).into()
         }.into()
     });
 }
