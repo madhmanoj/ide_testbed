@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
+use futures_signals::signal::Mutable;
 use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
 #[derive(Clone)]
 pub enum Target {
@@ -58,6 +59,9 @@ impl ContextMenu {
                         .style("cursor", "pointer")
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"Renaming Folder".into());
+                            if let Target::Directory(dir) = &context_menu.target  {
+                                dir.rename.set(true);
+                            }
                         }))
                     })
                 ])
@@ -82,6 +86,9 @@ impl ContextMenu {
                     .style("cursor", "pointer")
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
                         web_sys::console::log_1(&"Renaming File".into());
+                        if let Target::File(file) = &context_menu.target  {
+                            file.rename.set(true);
+                        }
                     }))
                 })
             ])
@@ -98,13 +105,16 @@ impl ContextMenu {
                 name: "Placeholder".to_owned().into(),
                 mode: DEFAULT_DIRECTORY_MODE.into(),
                 directories: vec![].into(),
-                files: vec![].into()
+                files: vec![].into(),
+                rename: Mutable::new(false)
             }
         );
 
         // to access the target directory for modification
         if let Target::Directory(dir) = &self.target {
-            dir.directories.lock_mut().push_cloned(new_directory);
+            dir.directories.lock_mut().push_cloned(new_directory.clone());
+            // this signals renaming after creating and pushing it into the directory structure
+            new_directory.rename.set(true);
         } 
     }
 
@@ -117,13 +127,16 @@ impl ContextMenu {
             File {
                 name: "Placeholder".to_owned().into(),
                 mode: DEFAULT_FILE_MODE.into(),
-                data: "Placeholder".as_bytes().to_vec().into()
+                data: "Placeholder".as_bytes().to_vec().into(),
+                rename: Mutable::new(false)
             }
         );
 
         // to access the target directory for modification
         if let Target::Directory(dir) = &self.target {
-            dir.files.lock_mut().push_cloned(new_file);
+            dir.files.lock_mut().push_cloned(new_file.clone());
+            // this signals renaming after creating and pushing it into the directory structure
+            new_file.rename.set(true);
         }
     }
 }
