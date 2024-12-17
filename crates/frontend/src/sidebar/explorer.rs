@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use dominator::{clone, events::{self, MouseButton, Input}, html, svg, Dom, EventOptions, with_node};
+use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
 use dominator_bulma::{block, icon, icon_text};
 use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
 
@@ -10,6 +10,11 @@ const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
      18V6L16 0M20 18H8V2H15V7H20V18M4 4V22H20V24H4C2.9 24 2 23.1 2 22V4H4Z";
 
+thread_local! {
+    static DRAGGED_ITEM: Mutable<Option<Target>> = Mutable::new(None);
+    pub static RENAME: Mutable<Option<Target>> = Mutable::new(None);
+}
+     
 fn folder_open_icon() -> Dom {
     // downward arrow
     const FOLDER_OPEN_ICON: &str = "M2,7 12,17 22,7Z";
@@ -49,6 +54,32 @@ fn file_icon() -> Dom {
     })
 }
 
+fn find_and_remove_from_parent(target: &Target, root: &Rc<Directory>) {
+    match target {
+        Target::File(file) => {
+            // Search for the parent directory containing the file
+            let mut files = root.files.lock_mut();
+            if let Some(pos) = files.iter().position(|f| Rc::ptr_eq(f, file)) {
+                files.remove(pos); // Remove the file
+                return;
+            }
+        }
+        Target::Directory(dragged_dir) => {
+            // Search for the parent directory containing the directory
+            let mut directories = root.directories.lock_mut();
+            if let Some(pos) = directories.iter().position(|d| Rc::ptr_eq(d, dragged_dir)) {
+                directories.remove(pos); // Remove the directory
+                return;
+            }
+        }
+    }
+
+    // Recursively search child directories
+    for child in root.directories.lock_ref().iter() {
+        find_and_remove_from_parent(target, child);
+    }
+}
+
 fn render_contents(
     directory: &Rc<Directory>,
     workspace_command_tx: &crate::WorkspaceCommandSender, 
@@ -63,51 +94,89 @@ fn render_contents(
             html!("li", {
                 .class("pl-5")
                 .class("pt-1")
+                .attr("draggable", "true")
+                .event(clone!(directory => move |_: events::DragStart| {
+                    DRAGGED_ITEM.with(|dragged| {
+                        dragged.set(Some(Target::Directory(directory.clone())));
+                    })
+                }))
+                .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
+                    event.prevent_default(); // Allow drop
+                })
+                .event_with_options(&EventOptions::preventable(), clone!(directory => move |event: events::Drop| {
+                    event.prevent_default();
+                    DRAGGED_ITEM.with(|dragged| {
+                        if let Some(target) = dragged.get_cloned() {
+                            crate::PROJECT.with(|root| {
+                                // Remove the dragged item from its original parent
+                                find_and_remove_from_parent(&target, &root);
+                            });
+                
+                            // Add the dragged item to the target directory
+                            match target {
+                                Target::File(file) => directory.files.lock_mut().push_cloned(file),
+                                Target::Directory(dragged_dir) => directory.directories.lock_mut().push_cloned(dragged_dir),
+                            }
+                        }
+                    });
+                }))
+                .event(|_: events::DragEnd| {
+                    DRAGGED_ITEM.with(|dragged| {
+                        dragged.set(None);
+                    });
+                })
                 .child(icon_text!({
+                    .class("is-inline-flex")
                     .style("cursor", "pointer")
-                    .event(clone!(expanded, directory => move |event: events::MouseDown| {
+                    .event(clone!(expanded => move |event: events::MouseDown| {
                         // left click to expand directory
-                        if !directory.rename.get() && event.button() == MouseButton::Left {
+                        let rename = RENAME.with(|rename| rename.get_cloned().is_some());
+                        let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
+                        if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                             let mut expanded = expanded.lock_mut();
                             *expanded = !*expanded;
                         }
                     }))
-                    .child(icon!("mr-0", {
-                        .child_signal(expanded.signal_ref(|expanded| match expanded {
-                            true => folder_open_icon(),
-                            false => folder_closed_icon(),
-                        }.into()))
-                    }))
-                    // input box for renaming
-                    .child_signal(directory.rename.signal_ref(clone!(directory => move |rename| {
-                        if *rename {
-                            Some(html!("input" => web_sys::HtmlInputElement, {
-                                .attr("type", "text")
-                                // converting String -> str -> &str
-                                .attr("value", &*directory.name.get_cloned())
-                                .with_node!(element => {
-                                    .event(clone!(directory => move |_: events::Input| {
-                                        // Cast the element to HtmlInputElement to access the value
-                                        directory.name.set(element.value());
-                                    }))
-                                    .event(clone!(directory => move |_: events::Blur| {
-                                        // Finalize renaming on blur
-                                        directory.rename.set(false);
-                                    }))
-                                    .event(clone!(directory => move |event: events::KeyDown| {
-                                        // Finalize renaming on pressing Enter
-                                        if event.key() == "Enter" {
-                                            directory.rename.set(false);
-                                        }
-                                    }))
-                                })
-                            }))
-                        } else {
-                            Some(html!("span", {
-                                .text_signal(directory.name.signal_cloned())
-                            }))
-                        }
-                    })))
+                    .children(&mut [
+                        icon!("mr-0", {
+                            .child_signal(expanded.signal_ref(|expanded| match expanded {
+                                true => folder_open_icon(),
+                                false => folder_closed_icon(),
+                            }.into()))
+                        }),
+                        html!("div", {
+                            // input box for renaming
+                            .child_signal(RENAME.with(|rename| rename.signal_cloned().map(clone!(directory => move |global_target| {
+                                match global_target {
+                                    Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &directory) => {
+                                        Some(html!("input" => web_sys::HtmlInputElement, {
+                                            .class("input")
+                                            .class("is-small")
+                                            .class("is-fullwidth") 
+                                            .attr("type", "text")
+                                            .attr("value", &*directory.name.get_cloned())
+                                            .with_node!(element => {
+                                                .event(clone!(directory => move |_: events::Input| {
+                                                    directory.name.set(element.value());
+                                                }))
+                                                .event(|_: events::Blur| {
+                                                    RENAME.with(|rename| rename.set(None));
+                                                })
+                                                .event(|event: events::KeyDown| {
+                                                    if event.key() == "Enter" {
+                                                        RENAME.with(|rename| rename.set(None));
+                                                    }
+                                                })
+                                            })
+                                        }))
+                                    },
+                                    _ => Some(html!("span", {
+                                        .text_signal(directory.name.signal_cloned())
+                                    })),
+                                }
+                            }))))
+                        })
+                    ])
                     // event listener for right click
                     .event(clone!(context_menu, directory => move |event: events::ContextMenu| {
                         web_sys::console::log_1(&"Right-clicked".into());
@@ -130,49 +199,71 @@ fn render_contents(
         .map(clone!(workspace_command_tx => move |file| html!("li", {
             .class("pl-5")
             .class("pt-1")
+            .attr("draggable", "true")
+            .event(clone!(file => move |_: events::DragStart| {
+                DRAGGED_ITEM.with(|dragged| {
+                    dragged.set(Some(Target::File(file.clone())));
+                })
+            }))
+            .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
+                event.prevent_default(); // Allow drop
+            })
+            .event(|_: events::DragEnd| {
+                DRAGGED_ITEM.with(|dragged| {
+                    dragged.set(None);
+                });
+            })
             .child(icon_text!({
+                .class("is-inline-flex")
                 .style("cursor", "pointer")
                 .event(clone!(workspace_command_tx, file => move |event: events::MouseDown| {
                     // left-click to open file in workspace
-                    if !file.rename.get() && event.button() == MouseButton::Left {
+                    let rename = RENAME.with(|rename| rename.get_cloned().is_some());
+                    let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
+                    if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                         workspace_command_tx
                             .unbounded_send(crate::WorkspaceCommand::OpenFile(file.clone()))
                             .unwrap()
                     }
                 }))
-                .child(icon!("mr-0", {
-                    .child(file_icon())
-                }))
-                // input box for renaming
-                .child_signal(file.rename.signal_ref(clone!(file => move |rename| {
-                    if *rename {
-                        Some(html!("input" => web_sys::HtmlInputElement, {
-                            .attr("type", "text")
-                            // converting String -> str -> &str
-                            .attr("value", &*file.name.get_cloned())
-                            .with_node!(element => {
-                                .event(clone!(file => move |_: events::Input| {
-                                    // Cast the element to HtmlInputElement to access the value
-                                    file.name.set(element.value());
-                                }))
-                                .event(clone!(file => move |_: events::Blur| {
-                                    // Finalize renaming on blur
-                                    file.rename.set(false);
-                                }))
-                                .event(clone!(file => move |event: events::KeyDown| {
-                                    // Finalize renaming on pressing Enter
-                                    if event.key() == "Enter" {
-                                        file.rename.set(false);
-                                    }
-                                }))
-                            })
-                        }))
-                    } else {
-                        Some(html!("span", {
-                            .text_signal(file.name.signal_cloned())
-                        }))
-                    }
-                })))
+                .children(&mut [
+                    icon!("mr-0", {
+                        .child(file_icon())
+                    }),
+                    html!("div", {
+                        // input box for renaming
+                        .child_signal(RENAME.with(|rename| rename.signal_cloned().map(clone!(file => move |target| {
+                            match target {
+                                Some(Target::File(ref fil)) if Rc::ptr_eq(fil, &file) => {
+                                    Some(html!("input" => web_sys::HtmlInputElement, {
+                                        .class("input")
+                                        .class("is-small")
+                                        .class("is-fullwidth") 
+                                        .attr("type", "text")
+                                        .attr("value", &*file.name.get_cloned())
+                                        .with_node!(element => {
+                                            .event(clone!(file => move |_: events::Input| {
+                                                file.name.set(element.value());
+                                                element.focus().unwrap();
+                                            }))
+                                            .event(|_: events::Blur| {
+                                                RENAME.with(|rename| rename.set(None));
+                                            })
+                                            .event(|event: events::KeyDown| {
+                                                if event.key() == "Enter" {
+                                                    RENAME.with(|rename| rename.set(None));
+                                                }
+                                            })
+                                        })
+                                    }))
+                                },
+                                _ => Some(html!("span", {
+                                    .text_signal(file.name.signal_cloned())
+                                })),
+                            }
+                        }))))
+                    })
+                ])
                 // event listener for right click
                 .event(clone!(context_menu => move |event: events::ContextMenu| {
                     web_sys::console::log_1(&"Right-clicked".into());
@@ -200,7 +291,7 @@ impl Default for Explorer {
     fn default() -> Self {
         Self {
             workspace: crate::PROJECT.with(|workspace| Rc::clone(workspace)),
-            context_menu: Mutable::new(None)
+            context_menu: Mutable::new(None),
         }
     }
 }
@@ -225,51 +316,84 @@ impl Explorer {
             .child(html!("ul", {
                 .child(html!("li", {
                     .class("pl-2")
+                    .attr("draggable", "true")
+                    .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
+                        event.prevent_default(); // Allow drop
+                    })
+                    .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
+                        event.prevent_default();
+                        DRAGGED_ITEM.with(|dragged| {
+                            if let Some(target) = dragged.get_cloned() {
+                                crate::PROJECT.with(|root| {
+                                    // Remove the dragged item from its original parent
+                                    find_and_remove_from_parent(&target, &root);
+                                });
+                    
+                                // Add the dragged item to the target directory
+                                match target {
+                                    Target::File(file) => this.workspace.files.lock_mut().push_cloned(file),
+                                    Target::Directory(dragged_dir) => this.workspace.directories.lock_mut().push_cloned(dragged_dir),
+                                }
+                            }
+                        });
+                    }))
+                    .event(|_: events::DragEnd| {
+                        DRAGGED_ITEM.with(|dragged| {
+                            dragged.set(None);
+                        });
+                    })
                     .child(icon_text!({
+                        .class("is-inline-flex")
                         .style("cursor", "pointer")
-                        .event(clone!(this, expanded => move |event: events::MouseDown| {
+                        .event(clone!(expanded => move |event: events::MouseDown| {
                             // left-click to expand directory
-                            if !this.workspace.rename.get() && event.button() == MouseButton::Left {
+                            let rename = RENAME.with(|rename| rename.get_cloned().is_some());
+                            let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
+                            if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                                 let mut expanded = expanded.lock_mut();
                                 *expanded = !*expanded;
                             }
                         }))
-                        .child(icon!("mr-0", {
-                            .child_signal(expanded.signal_ref(|expanded| match expanded {
-                                true => folder_open_icon(),
-                                false => folder_closed_icon(),
-                            }.into()))
-                        }))
-                        // input box for renaming
-                        .child_signal(this.workspace.rename.signal_ref(clone!(this => move |rename| {
-                            if *rename {
-                                Some(html!("input" => web_sys::HtmlInputElement, {
-                                    .attr("type", "text")
-                                    // converting String -> str -> &str
-                                    .attr("value", &*this.workspace.name.get_cloned())
-                                    .with_node!(element => {
-                                        .event(clone!(this => move |_: events::Input| {
-                                            // Cast the element to HtmlInputElement to access the value
-                                            this.workspace.name.set(element.value());
-                                        }))
-                                        .event(clone!(this => move |_: events::Blur| {
-                                            // Finalize renaming on blur
-                                            this.workspace.rename.set(false);
-                                        }))
-                                        .event(clone!(this => move |event: events::KeyDown| {
-                                            // Finalize renaming on pressing Enter
-                                            if event.key() == "Enter" {
-                                                this.workspace.rename.set(false);
-                                            }
-                                        }))
-                                    })
-                                }))
-                            } else {
-                                Some(html!("span", {
-                                    .text_signal(this.workspace.name.signal_cloned())
-                                }))
-                            }
-                        })))
+                        .children(&mut [
+                            icon!("mr-0", {
+                                .child_signal(expanded.signal_ref(|expanded| match expanded {
+                                    true => folder_open_icon(),
+                                    false => folder_closed_icon(),
+                                }.into()))
+                            }),
+                            html!("div", {
+                                // input box for renaming
+                                .child_signal(RENAME.with(|rename| rename.signal_cloned().map(clone!(this => move |target| {
+                                    match target {
+                                        Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &this.workspace) => {
+                                            Some(html!("input" => web_sys::HtmlInputElement, {
+                                                .class("input")
+                                                .class("is-small")
+                                                .class("is-fullwidth") 
+                                                .attr("type", "text")
+                                                .attr("value", &*this.workspace.name.get_cloned())
+                                                .with_node!(element => {
+                                                    .event(clone!(this => move |_: events::Input| {
+                                                        this.workspace.name.set(element.value());
+                                                    }))
+                                                    .event(|_: events::Blur| {
+                                                        RENAME.with(|rename| rename.set(None));
+                                                    })
+                                                    .event(|event: events::KeyDown| {
+                                                        if event.key() == "Enter" {
+                                                            RENAME.with(|rename| rename.set(None));
+                                                        }
+                                                    })
+                                                })
+                                            }))
+                                        },
+                                        _ => Some(html!("span", {
+                                            .text_signal(this.workspace.name.signal_cloned())
+                                        })),
+                                    }
+                                }))))
+                            })
+                        ])
                         // event listener for right click
                         .event(clone!(this => move |event: events::ContextMenu| {
                             web_sys::console::log_1(&"Right-clicked".into());

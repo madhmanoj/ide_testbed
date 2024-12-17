@@ -6,8 +6,7 @@ use futures_signals::{signal::Mutable, signal_vec::MutableVec};
 pub struct File {
     pub name: Mutable<String>,
     pub mode: Mutable<u32>,
-    pub data: Mutable<Vec<u8>>,
-    pub rename: Mutable<bool>
+    pub data: Mutable<Vec<u8>>
 }
 
 #[derive(Clone)]
@@ -15,7 +14,6 @@ pub struct Directory {
     pub name: Mutable<String>,
     pub mode: Mutable<u32>,
     pub directories: MutableVec<Rc<Directory>>,
-    pub files: MutableVec<Rc<File>>,
-    pub rename: Mutable<bool>
+    pub files: MutableVec<Rc<File>>
 }
 
