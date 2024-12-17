@@ -130,9 +130,9 @@ thread_local! {
                             mode: DEFAULT_FILE_MODE.into(),
                             data: VELOCITY_CONTROL_PY.as_bytes().to_vec().into()
                         }.into(),
-                    ].into()
+                    ].into(),
                 }.into()
-            ].into(),
+            ].into()
         }.into()
     });
 }

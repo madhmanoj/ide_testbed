@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
+use crate::sidebar::explorer::RENAME;
 use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
 #[derive(Clone)]
 pub enum Target {
@@ -58,6 +59,11 @@ impl ContextMenu {
                         .style("cursor", "pointer")
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"Renaming Folder".into());
+                            if let Target::Directory(dir) = &context_menu.target  {
+                                RENAME.with(|rename| {
+                                    rename.set(Some(Target::Directory(dir.clone())));
+                                });
+                            }
                         }))
                     })
                 ])
@@ -82,6 +88,11 @@ impl ContextMenu {
                     .style("cursor", "pointer")
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
                         web_sys::console::log_1(&"Renaming File".into());
+                        if let Target::File(file) = &context_menu.target  {
+                            RENAME.with(|rename| {
+                                rename.set(Some(Target::File(file.clone())));
+                            });
+                        }
                     }))
                 })
             ])
@@ -104,7 +115,11 @@ impl ContextMenu {
 
         // to access the target directory for modification
         if let Target::Directory(dir) = &self.target {
-            dir.directories.lock_mut().push_cloned(new_directory);
+            dir.directories.lock_mut().push_cloned(new_directory.clone());
+            // this signals renaming after creating and pushing it into the directory structure
+            RENAME.with(|rename| {
+                rename.set(Some(Target::Directory(new_directory.clone())));
+            });
         } 
     }
 
@@ -123,7 +138,11 @@ impl ContextMenu {
 
         // to access the target directory for modification
         if let Target::Directory(dir) = &self.target {
-            dir.files.lock_mut().push_cloned(new_file);
+            dir.files.lock_mut().push_cloned(new_file.clone());
+            // this signals renaming after creating and pushing it into the directory structure
+            RENAME.with(|rename| {
+                rename.set(Some(Target::File(new_file.clone())));
+            });
         }
     }
 }
