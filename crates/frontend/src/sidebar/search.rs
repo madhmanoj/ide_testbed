@@ -1,5 +1,4 @@
 use dominator::{html, svg, Dom};
-use dominator_bulma::{block, icon_text};
 use futures_signals::signal::{self, Signal, SignalExt};
 
 const ICON_SVG_PATH: &str =
@@ -22,8 +21,8 @@ impl Search {
         let active = active.broadcast();
         svg!("svg", {
             .attr("viewBox", "0 0 24 24")
-            .class_signal("has-fill-white", active.signal())
-            .class_signal("has-fill-grey", signal::not(active.signal()))
+            .class_signal("fill-white", active.signal())
+            .class_signal("fill-darkgray", signal::not(active.signal()))
             .child(svg!("path", {
                 .attr("d", ICON_SVG_PATH)
             }))
@@ -31,11 +30,16 @@ impl Search {
     }
 
     pub fn render(&self) -> dominator::Dom {
-        block!({
-            .class("has-background-white-ter")
+        html!("div", {
+            .class("block")
+            .class("bg-lightgray")
             .style("height", "100vh")
-            .child(block!("p-3", "m-0", {
-                .child(icon_text!({
+            .child(html!("div", {
+                .class("block")
+                .class("p-3")
+                .class("m-0")
+                .child(html!("div", {
+                    .class("icon_text")
                     .child(html!("span", {
                         .style("font-size", ".75em")
                         .style("letter-spacing", ".1em")

@@ -1,3 +1,19 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+    .icon {
+        @apply grid justify-items-center items-center shrink-0 h-6 w-6;
+        transition-property: color;
+        transition-duration: 294ms;
+    }
+
+    .icon-text {
+        @apply grid grid-flow-col auto-cols-max gap-[0.25em] leading-6 text-inherit;
+    }
+
+    .content {
+        @apply text-[2em] mb-[0.5em];
+    }
+}

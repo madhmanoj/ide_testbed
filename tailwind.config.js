@@ -4,7 +4,16 @@ module.exports = {
     './crates/frontend/src/**/*.rs'
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'gray': '#e9e9e9',
+        'offblack': '#2c2c2c',
+        'lightgray': '#f3f3f3',
+        'coreblue': '#007acc',
+        'darkgray': '#828282',
+        'innergray': '#dfdfdf'
+      }
+    },
   },
   plugins: [],
 }

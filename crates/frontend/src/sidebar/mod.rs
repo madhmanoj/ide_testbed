@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-use dominator::{clone, events, Dom, EventOptions};
-use dominator_bulma::{block, column, columns, image};
+use dominator::{clone, events, Dom, EventOptions, html};
 use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}};
 
 pub mod explorer;
@@ -81,33 +80,40 @@ impl Sidebar {
     }
 
     pub fn render(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> Dom {
-        columns!("is-gapless", "is-mobile", {
+        html!("div", {
+            .class("grid")
+            .class("grid-cols-[48px_170px_4px]")
+            .class("gap-0")
+
             // menu
-            .child(column!("is-narrow", {
+            .child(html!("div", {
+                .class("col-span-1")
                 .style("width", &format!("{MENU_SIZE_PX}px"))
                 .child(Self::render_menu(this))
             }))
             
             // panel
             .child_signal(this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
-                panel.map(clone!(this, workspace_command_tx => move |panel| column!("is-narrow", {
+                panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
+                    .class("col-span-1")
                     .style_signal("width", this.panel_size.signal_ref(|size| {
                         format!("{size}px")
                     }))
-                    .class_signal("is-hidden", this.panel_size.signal().eq(0))
+                    .class_signal("hidden", this.panel_size.signal().eq(0))
                     .child(panel.render(&workspace_command_tx))
                 })))
             })))
             
             // resizer
             .child_signal(this.active_panel.signal_cloned().map(clone!(this => move |panel| {
-                panel.map(clone!(this => move |_| column!("is-narrow", {
+                panel.map(clone!(this => move |_| html!("div", {
+                    .class("col-span-1")
                     .style("cursor", "ew-resize")
                     .style("min-height", "100vh")
                     .style("width", &format!("{RESIZER_PX}px"))
-                    .class_signal("has-background-white-ter",
+                    .class_signal("bg-lightgray",
                         signal::not(signal::or(this.resize_active.signal(), this.resizer_hover.signal())))
-                    .class_signal("has-background-info",
+                    .class_signal("bg-coreblue",
                         signal::or(this.resize_active.signal(), this.resizer_hover.signal()))
                     .event_with_options(&EventOptions::preventable(),
                         clone!(this => move |ev: events::PointerDown| {
@@ -165,7 +171,9 @@ impl Sidebar {
                         .unwrap_or(false)));
                 let active = signal::or(active, mouse_over.signal());
 
-                image!("px-2", "pt-4", {
+                html!("div", {
+                    .class("px-2")
+                    .class("pt-4")
                     .attr("title", panel.tooltip())
                     .child(panel.icon(active))
                     .style("cursor", "pointer")
@@ -189,8 +197,9 @@ impl Sidebar {
                 })
             }));
 
-        block!({
-            .class("has-background-grey-darker")
+        html!("div", {
+            .class("block")
+            .class("bg-offblack")
             .style("min-height", "100vh")
             .children(buttons)
         })

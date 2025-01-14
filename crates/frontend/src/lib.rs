@@ -52,15 +52,11 @@ pub async fn main() {
         .class("grid-cols-[auto_1fr]")
         .class("gap-0")
         .child(html!("div", {
-            .class("grid")
-            .class("grid-cols-[48px_170px_4px]")
-            .class("gap-0")
+            .class("col-span-1")
             .child(Sidebar::render(&sidebar, &workspace_command_tx))
         }))
         .child(html!("div", {
-            .class("grid")
-            .class("grid-rows-[1fr_auto_auto]")
-            .class("gap-0")
+            .class("col-span-1")
             .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
         }))
     });

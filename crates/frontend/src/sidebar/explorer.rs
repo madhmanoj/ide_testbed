@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
-use dominator_bulma::{block, icon, icon_text};
 use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
 
 use crate::{contextmenu::{ContextMenu, Target}, vfs::Directory};
@@ -125,8 +124,9 @@ fn render_contents(
                         dragged.set(None);
                     });
                 })
-                .child(icon_text!({
-                    .class("is-inline-flex")
+                .child(html!("div", {
+                    .class("icon_text")
+                    .class("inline-flex")
                     .style("cursor", "pointer")
                     .event(clone!(expanded => move |event: events::MouseDown| {
                         // left click to expand directory
@@ -138,7 +138,9 @@ fn render_contents(
                         }
                     }))
                     .children(&mut [
-                        icon!("mr-0", {
+                        html!("div", {
+                            .class("icon")
+                            .class("mr-0")
                             .child_signal(expanded.signal_ref(|expanded| match expanded {
                                 true => folder_open_icon(),
                                 false => folder_closed_icon(),
@@ -150,9 +152,6 @@ fn render_contents(
                                 match global_target {
                                     Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &directory) => {
                                         Some(html!("input" => web_sys::HtmlInputElement, {
-                                            .class("input")
-                                            .class("is-small")
-                                            .class("is-fullwidth") 
                                             .attr("type", "text")
                                             .attr("value", &*directory.name.get_cloned())
                                             .with_node!(element => {
@@ -213,8 +212,9 @@ fn render_contents(
                     dragged.set(None);
                 });
             })
-            .child(icon_text!({
-                .class("is-inline-flex")
+            .child(html!("div", {
+                .class("icon_text")
+                .class("inline-flex")
                 .style("cursor", "pointer")
                 .event(clone!(workspace_command_tx, file => move |event: events::MouseDown| {
                     // left-click to open file in workspace
@@ -227,7 +227,9 @@ fn render_contents(
                     }
                 }))
                 .children(&mut [
-                    icon!("mr-0", {
+                    html!("div", {
+                        .class("icon")
+                        .class("mr-0")
                         .child(file_icon())
                     }),
                     html!("div", {
@@ -236,9 +238,6 @@ fn render_contents(
                             match target {
                                 Some(Target::File(ref fil)) if Rc::ptr_eq(fil, &file) => {
                                     Some(html!("input" => web_sys::HtmlInputElement, {
-                                        .class("input")
-                                        .class("is-small")
-                                        .class("is-fullwidth") 
                                         .attr("type", "text")
                                         .attr("value", &*file.name.get_cloned())
                                         .with_node!(element => {
@@ -299,11 +298,16 @@ impl Default for Explorer {
 impl Explorer {
     pub fn render(this: &Rc<Explorer>, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
         let expanded = Mutable::new(true);
-        block!({
-            .class("has-background-white-ter")
+        html!("div", {
+            .class("block")
+            .class("bg-lightgray")
             .style("height", "100vh")
-            .child(block!("p-3", "m-0", {
-                .child(icon_text!({
+            .child(html!("div", {
+                .class("block")
+                .class("p-3")
+                .class("m-0")
+                .child(html!("div", { 
+                    .class("icon_text")
                     .child(html!("span", {
                         .style("font-size", ".75em")
                         .style("letter-spacing", ".1em")
@@ -342,8 +346,9 @@ impl Explorer {
                             dragged.set(None);
                         });
                     })
-                    .child(icon_text!({
-                        .class("is-inline-flex")
+                    .child(html!("div", {
+                        .class("icon_text")
+                        .class("inline-flex")
                         .style("cursor", "pointer")
                         .event(clone!(expanded => move |event: events::MouseDown| {
                             // left-click to expand directory
@@ -355,7 +360,8 @@ impl Explorer {
                             }
                         }))
                         .children(&mut [
-                            icon!("mr-0", {
+                            html!("div", {
+                                .class("mr-0")
                                 .child_signal(expanded.signal_ref(|expanded| match expanded {
                                     true => folder_open_icon(),
                                     false => folder_closed_icon(),
@@ -367,9 +373,6 @@ impl Explorer {
                                     match target {
                                         Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &this.workspace) => {
                                             Some(html!("input" => web_sys::HtmlInputElement, {
-                                                .class("input")
-                                                .class("is-small")
-                                                .class("is-fullwidth") 
                                                 .attr("type", "text")
                                                 .attr("value", &*this.workspace.name.get_cloned())
                                                 .with_node!(element => {
@@ -436,8 +439,8 @@ impl Explorer {
         let active = active.broadcast();
         svg!("svg", {
             .attr("viewBox", "0 0 24 24")
-            .class_signal("has-fill-white", active.signal())
-            .class_signal("has-fill-grey", signal::not(active.signal()))
+            .class_signal("fill-white", active.signal())
+            .class_signal("fill-darkgray", signal::not(active.signal()))
             .child(svg!("path", {
                 .attr("d", ICON_SVG_PATH)
             }))
