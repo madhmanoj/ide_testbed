@@ -1,6 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
-use dominator_bulma::{column, columns};
+use dominator::html;
 use futures::channel::mpsc;
 use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
 use once_cell::sync::Lazy;
@@ -47,11 +47,20 @@ pub async fn main() {
         window_width.saturating_sub(*sidebar_width)
     });
 
-    let outer = columns!("is-gapless", "is-mobile", {
-        .child(column!("is-narrow", {
+    let outer = html!("div", {
+        .class("grid")
+        .class("grid-cols-[auto_1fr]")
+        .class("gap-0")
+        .child(html!("div", {
+            .class("grid")
+            .class("grid-cols-[48px_170px_4px]")
+            .class("gap-0")
             .child(Sidebar::render(&sidebar, &workspace_command_tx))
         }))
-        .child(column!({
+        .child(html!("div", {
+            .class("grid")
+            .class("grid-rows-[1fr_auto_auto]")
+            .class("gap-0")
             .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
         }))
     });

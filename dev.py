@@ -89,18 +89,30 @@ def build():
     if rspack_proc.returncode != 0:
         raise RuntimeError('rspack terminated with {}'.format(rspack_proc.returncode))
     ### Run Node-Sass
-    print('Generating styles')
-    node_sass_args = [
+    # print('Generating styles')
+    # node_sass_args = [
+    #     'npx',
+    #     'node-sass',
+    #     '--omit-source-map-url',
+    #     project_path + '/styles.scss',
+    #     dist_path + '/styles.css'
+    # ]
+    # node_sass_proc = subprocess.Popen(node_sass_args, cwd=build_path)
+    # node_sass_proc.wait()
+    # if node_sass_proc.returncode != 0:
+    #     raise RuntimeError('node-sass terminated with {}'.format(node_sass_proc.returncode))
+    # Generating css using tailwind
+    print('Generating styles with Tailwind CSS')
+    tailwind_args = [
         'npx',
-        'node-sass',
-        '--omit-source-map-url',
-        project_path + '/styles.scss',
-        dist_path + '/styles.css'
+        'tailwindcss',
+        '-i', project_path + '/styles.css',  # Input CSS with Tailwind directives
+        '-o', dist_path + '/styles.css'        # Output compiled CSS
     ]
-    node_sass_proc = subprocess.Popen(node_sass_args, cwd=build_path)
-    node_sass_proc.wait()
-    if node_sass_proc.returncode != 0:
-        raise RuntimeError('node-sass terminated with {}'.format(node_sass_proc.returncode))
+    tailwind_proc = subprocess.Popen(tailwind_args, cwd=project_path)
+    tailwind_proc.wait()
+    if tailwind_proc.returncode != 0:
+        raise RuntimeError('Tailwind CSS build terminated with {}'.format(tailwind_proc.returncode))
     ### Copy static assets
     print('Copying static assets')
     shutil.copytree(static_path, dist_path, dirs_exist_ok=True)
