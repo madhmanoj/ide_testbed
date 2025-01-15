@@ -2,7 +2,7 @@ use std::{sync::Arc, time::{Duration, UNIX_EPOCH}};
 
 use chrono::DateTime;
 use dominator::{html, Dom};
-use dominator_bulma::{block, icon_text, tag};
+use dominator_bulma::tag;
 use futures_signals::signal_vec::SignalVecExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -12,23 +12,29 @@ pub struct Console {}
 
 impl Console {
     pub fn render(&self) -> dominator::Dom {
-        block!({
-            .style("height", "100%")
-            .class("has-background-white-ter")
-            .child(block!("p-3", "m-0", {
-                .child(icon_text!({
+        html!("div", {
+            .class("h-full")
+            .class("bg-lightgray")
+            .child(html!("div", {
+                .class("block")
+                .class("p-3")
+                .class("m-0")
+                .child(html!("div", {
+                    .class("icon-text")
                     .child(html!("span", {
-                        .class("is-size-7")
-                        .class("is-uppercase")
+                        .class("text-xs")
+                        .class("uppercase")
                         .style("letter-spacing", ".1em")
                         .text("Log messages")
                     }))
                 }))
             }))
-            .child(block!("p-2", {
+            .child(html!("div", {
+                .class("p-2")
+                .class("block")
                 .style("overflow-y", "scroll")
-                .style("height", "calc(100% - 48px)") // 48 px for the block above
-                .class("has-background-white")
+                .style("height", "calc(100% - 40px)") // 40 px for the block above
+                .class("bg-white")
                 .children_signal_vec(crate::GLOBAL_LOG.with(|messages| messages
                     .signal_vec_cloned().map(render_entry)))
                 .scroll_top_signal(crate::GLOBAL_LOG.with(|messages| messages

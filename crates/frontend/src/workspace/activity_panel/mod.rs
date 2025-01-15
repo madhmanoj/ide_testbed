@@ -1,14 +1,13 @@
 use std::{pin::Pin, rc::Rc};
 
-use dominator::{clone, events, svg, Dom, EventOptions};
-use dominator_bulma::{block, column, columns, icon, icon_text};
+use dominator::{clone, events, svg, Dom, EventOptions, html};
 use futures::StreamExt;
 use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 
 pub mod editor;
 pub mod welcome;
 
-const TAB_HEIGHT: u32 = 48;
+const TAB_HEIGHT: u32 = 35;
 
 enum Activity {
     Editor(Rc<editor::Editor>),
@@ -59,7 +58,11 @@ impl Activity {
             active_activity.as_ref().is_some_and(|active_activity| Rc::ptr_eq(active_activity, &this))
         }));
 
-        block!("py-3", "px-3", {
+        html!("div", {
+            .class("block")
+            .class("py-1")
+            .class("px-1")
+            .class("gap-1")
             .style("cursor", "pointer")
             .event(clone!(mouse_over => move |_: events::PointerOver| {
                 mouse_over.set_neq(true);
@@ -70,15 +73,19 @@ impl Activity {
             .event(clone!(panel, this => move |_: events::PointerDown| {                
                 panel.active_activity.set(Some(this.clone()))
             }))
-            .class_signal("has-background-white",signal::or(is_active, mouse_over.signal()))
-            .child(icon_text!({
-                .child(icon!({
+            .class_signal("bg-white",signal::or(is_active, mouse_over.signal()))
+            .child(html!("div", {
+                .class("icon_text")
+                .class("inline-flex")
+                .child(html!("div", {
+                    .class("icon")
                     .child(this.icon())
                 }))
                 .child(this.label())
                 // HACK DO NOT SHOW THE CLOSE ICON 
                 .apply_if(matches!(**this, Activity::Editor(_)), |dom| {
-                    dom.child(icon!({
+                    dom.child(html!("div", {
+                        .class("icon")
                         .event(clone!(mouse_over_close => move |_: events::PointerOver| {
                             mouse_over_close.set_neq(true);
                         }))
@@ -94,8 +101,8 @@ impl Activity {
                                 *active_activity = panel.activities.lock_ref().first().cloned();
                             }
                         }))
-                        .class_signal("has-background-white-ter", mouse_over_close.signal())
-                        .class_signal("is-invisible", signal::not(mouse_over.signal()))
+                        .class_signal("bg-lightgray", mouse_over_close.signal())
+                        .class_signal("invisible", signal::not(mouse_over.signal()))
                         .child(close_icon)
                     }))
                 })
@@ -142,7 +149,11 @@ impl ActivityPanel {
         let width = width.broadcast();
         let height = height.broadcast();
 
-        columns!("is-gapless", "is-mobile", "is-multiline", {
+        html!("div", {
+            .class("grid")
+            .class("grid-rows-[auto_1fr]")
+            .class("gap-0")
+            .class("h-full")
             .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
                 match command {
                     crate::WorkspaceCommand::OpenFile(file) => {
@@ -168,11 +179,17 @@ impl ActivityPanel {
                 (count == 0).then(|| Self::render_background(height.signal()))
             })))
             // tabs take up one full line
-            .child(column!("is-full", {
-                .class("has-background-white-ter")
-                .child(columns!("is-gapless", "is-mobile", {
+            .child(html!("div", {
+                .class("row-span-1")
+                .class("bg-lightgray")
+                .class("h-[35px]")
+                .child(html!("div", {
+                    .class("inline-flex")
+                    .class("gap-0")
                     .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
-                        column!("is-narrow", {
+                        html!("div", {
+                            .class("h-full")
+                            .class("w-[110px]")
                             .child(Activity::render_tab(&activity, &this))
                         })
                     })))
@@ -181,7 +198,9 @@ impl ActivityPanel {
             .child_signal(this.active_activity
                 .signal_cloned()
                 .map(move |activity: Option<Rc<Activity>>| activity
-                    .map(clone!(width, height => move |activity| column!("is-full", {
+                    .map(clone!(width, height => move |activity| html!("div", {
+                        .class("row-span-1")
+                        .class("h-full")
                         .child_signal(Activity::render(
                             &activity,
                             width.signal(),
@@ -195,7 +214,7 @@ impl ActivityPanel {
     fn render_background(
         height: impl Signal<Item = u32> + 'static
     ) -> Dom {
-        column!("is-full", {
+        html!("div", {
             .style_signal("height", height.map(|height| format!("{height}px")))
             .style("background-image", "url('images/background.png')")
             .style("background-repeat", "no-repeat")

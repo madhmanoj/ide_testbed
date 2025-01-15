@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use dominator::{html, svg, Dom};
-use dominator_bulma::{block, column, columns, content};
 use futures_signals::signal::{self, Signal, SignalExt};
 
 const MAX_CONTENT_WIDTH: u32 = 850;
@@ -22,14 +21,25 @@ impl Welcome {
             .map(|width| (((width as f32) * 0.8) as u32).min(MAX_CONTENT_WIDTH))
             .broadcast();
       
-        let dom = columns!("is-mobile", "is-gapless", "is-centered", {
+        let dom = html!("div", {
+            .class("justify-center")
+            .class("gap-0")
             .style("overflow-y", "scroll")
             .style_signal("height", height.map(|height| format!("{height}px")))
-            .child(column!("is-narrow", {
-                .child(block!("py-6", {
+            .child(html!("div", {
+                .class("place-items-center")
+                .class("h-full")
+                .child(html!("div", {
+                    .class("block")
+                    .class("h-full")
+                    .class("place-content-center")
+                    .class("py-6")
                     .style_signal("max-width", content_max_width.signal_ref(|width| format!("{width}px")))
-                    .child(content!({
-                        .child(html!("h1", { .text("Web-based IDE") })) 
+                    .child(html!("div", {
+                        .class("content")
+                        .child(html!("h1", {
+                            .text("Web-based IDE")
+                        })) 
                     }))
                 }))
             }))
@@ -55,9 +65,9 @@ impl Welcome {
             10C19.1 10 20 10.9 20 12S19.1 14 18 14 16 13.1 16 12 16.9 10 18 10M18 \
             4C19.1 4 20 4.9 20 6S19.1 8 18 8 16 7.1 16 6 16.9 4 18 4Z";
         svg!("svg", {
-            .attr("height", "2em")
+            .attr("height", "1.5em")
             .attr("viewBox", "0 0 24 24")
-            .class("has-fill-info")
+            .class("fill-coreblue")
             .child(svg!("path", {
                 .attr("d", PATH)
             }))

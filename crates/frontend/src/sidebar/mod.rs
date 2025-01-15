@@ -82,7 +82,7 @@ impl Sidebar {
     pub fn render(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> Dom {
         html!("div", {
             .class("grid")
-            .class("grid-cols-[48px_170px_4px]")
+            .class("grid-cols-[48px_auto_4px]")
             .class("gap-0")
 
             // menu
