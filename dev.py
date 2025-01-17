@@ -33,6 +33,8 @@ def build():
         os.symlink('../package-lock.json', build_path + '/package-lock.json')
     if not os.path.islink(build_path + '/rspack.config.js'):
         os.symlink('../rspack.config.js', build_path + '/rspack.config.js')
+    if not os.path.islink(build_path + '/tailwind.config.js'):
+        os.symlink('../tailwind.config.js', build_path + '/tailwind.config.js')
     ### Run npm install
     print('Fetching node packages')
     npm_args = ['npm', 'install']
@@ -109,7 +111,7 @@ def build():
         '-i', project_path + '/styles.css',  # Input CSS with Tailwind directives
         '-o', dist_path + '/styles.css'        # Output compiled CSS
     ]
-    tailwind_proc = subprocess.Popen(tailwind_args, cwd=project_path)
+    tailwind_proc = subprocess.Popen(tailwind_args, cwd=build_path)
     tailwind_proc.wait()
     if tailwind_proc.returncode != 0:
         raise RuntimeError('Tailwind CSS build terminated with {}'.format(tailwind_proc.returncode))
