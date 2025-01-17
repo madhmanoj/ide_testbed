@@ -20,7 +20,7 @@ fn folder_open_icon() -> Dom {
     svg!("svg", {
         .attr("pointer-events", "none")
         .attr("height", "1em")
-        .attr("viewBox", "0 0 24 24")
+        .attr("viewBox", "0 0 27 27")
         .child(svg!("path", {
             .attr("d", FOLDER_OPEN_ICON)
         }))
@@ -33,7 +33,7 @@ fn folder_closed_icon() -> Dom {
     svg!("svg", {
         .attr("pointer-events", "none")
         .attr("height", "1em")
-        .attr("viewBox", "0 0 24 24")
+        .attr("viewBox", "0 0 27 27")
         .child(svg!("path", {
             .attr("d", FOLDER_CLOSED_ICON)
         }))
@@ -92,7 +92,7 @@ fn render_contents(
             let expanded = Mutable::new(true);
             html!("li", {
                 .class("pl-5")
-                .class("pt-1")
+                .class("pt-0")
                 .attr("draggable", "true")
                 .event(clone!(directory => move |_: events::DragStart| {
                     DRAGGED_ITEM.with(|dragged| {
@@ -152,6 +152,7 @@ fn render_contents(
                                 match global_target {
                                     Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &directory) => {
                                         Some(html!("input" => web_sys::HtmlInputElement, {
+                                            .class("input")
                                             .attr("type", "text")
                                             .attr("value", &*directory.name.get_cloned())
                                             .with_node!(element => {
@@ -197,7 +198,7 @@ fn render_contents(
             left_file.name.lock_ref().cmp(&*right_file.name.lock_ref()))
         .map(clone!(workspace_command_tx => move |file| html!("li", {
             .class("pl-5")
-            .class("pt-1")
+            .class("pt-0")
             .attr("draggable", "true")
             .event(clone!(file => move |_: events::DragStart| {
                 DRAGGED_ITEM.with(|dragged| {
@@ -238,6 +239,7 @@ fn render_contents(
                             match target {
                                 Some(Target::File(ref fil)) if Rc::ptr_eq(fil, &file) => {
                                     Some(html!("input" => web_sys::HtmlInputElement, {
+                                        .class("input")
                                         .attr("type", "text")
                                         .attr("value", &*file.name.get_cloned())
                                         .with_node!(element => {
@@ -301,17 +303,20 @@ impl Explorer {
         html!("div", {
             .class("block")
             .class("bg-lightgray")
-            .style("height", "100vh")
+            .class("h-screen")
             .child(html!("div", {
                 .class("block")
-                .class("p-3")
                 .class("m-0")
+                .class("h-[35px]")
                 .child(html!("div", { 
                     .class("icon_text")
+                    .class("pl-6")
+                    .class("pt-2")
                     .child(html!("span", {
-                        .style("font-size", ".75em")
-                        .style("letter-spacing", ".1em")
-                        .style("text-transform", "uppercase")
+                        .class("text-darkgray")
+                        .class("text-[0.70em]")
+                        .class("tracking-tight")
+                        .class("uppercase")
                         .text("Explorer")
                     }))
                 }))
@@ -319,7 +324,6 @@ impl Explorer {
             // project listing
             .child(html!("ul", {
                 .child(html!("li", {
-                    .class("pl-2")
                     .attr("draggable", "true")
                     .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                         event.prevent_default(); // Allow drop
@@ -362,6 +366,7 @@ impl Explorer {
                         .children(&mut [
                             html!("div", {
                                 .class("mr-0")
+                                .class("icon")
                                 .child_signal(expanded.signal_ref(|expanded| match expanded {
                                     true => folder_open_icon(),
                                     false => folder_closed_icon(),
@@ -373,6 +378,7 @@ impl Explorer {
                                     match target {
                                         Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &this.workspace) => {
                                             Some(html!("input" => web_sys::HtmlInputElement, {
+                                                .class("input")
                                                 .attr("type", "text")
                                                 .attr("value", &*this.workspace.name.get_cloned())
                                                 .with_node!(element => {
@@ -438,7 +444,7 @@ impl Explorer {
     pub fn icon(&self, active: impl Signal<Item = bool> + 'static) -> Dom {
         let active = active.broadcast();
         svg!("svg", {
-            .attr("viewBox", "0 0 24 24")
+            .attr("viewBox", "0 0 27 27")
             .class_signal("fill-white", active.signal())
             .class_signal("fill-darkgray", signal::not(active.signal()))
             .child(svg!("path", {

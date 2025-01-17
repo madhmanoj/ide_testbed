@@ -108,8 +108,8 @@ impl Sidebar {
             .child_signal(this.active_panel.signal_cloned().map(clone!(this => move |panel| {
                 panel.map(clone!(this => move |_| html!("div", {
                     .class("col-span-1")
-                    .style("cursor", "ew-resize")
-                    .style("min-height", "100vh")
+                    .class("cursor-ew-resize")
+                    .class("min-h-screen")
                     .style("width", &format!("{RESIZER_PX}px"))
                     .class_signal("bg-lightgray",
                         signal::not(signal::or(this.resize_active.signal(), this.resizer_hover.signal())))
@@ -174,9 +174,9 @@ impl Sidebar {
                 html!("div", {
                     .class("px-2")
                     .class("pt-4")
+                    .class("cursor-pointer")
                     .attr("title", panel.tooltip())
                     .child(panel.icon(active))
-                    .style("cursor", "pointer")
                     .event(clone!(mouse_over => move |_: events::PointerOver| {
                         mouse_over.set_neq(true);
                     }))
@@ -200,7 +200,7 @@ impl Sidebar {
         html!("div", {
             .class("block")
             .class("bg-offblack")
-            .style("min-height", "100vh")
+            .class("min-h-screen")
             .children(buttons)
         })
     }

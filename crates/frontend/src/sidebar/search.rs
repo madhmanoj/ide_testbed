@@ -33,17 +33,20 @@ impl Search {
         html!("div", {
             .class("block")
             .class("bg-lightgray")
-            .style("height", "100vh")
+            .class("h-screen")
             .child(html!("div", {
                 .class("block")
-                .class("p-3")
                 .class("m-0")
+                .class("h-[35px]")
                 .child(html!("div", {
                     .class("icon_text")
+                    .class("pl-6")
+                    .class("pt-2")
                     .child(html!("span", {
-                        .style("font-size", ".75em")
-                        .style("letter-spacing", ".1em")
-                        .style("text-transform", "uppercase")
+                        .class("text-darkgray")
+                        .class("text-[0.70em]")
+                        .class("tracking-tight")
+                        .class("uppercase")
                         .text("Search")
                     }))
                 }))
