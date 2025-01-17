@@ -154,7 +154,10 @@ def serve() -> Tuple[socketserver.TCPServer, int]:
     current_port = 3000
     while current_port < 3016:
         try:
-            server = socketserver.TCPServer(('localhost', current_port), RequestHandler)
+            server = socketserver.TCPServer(('0.0.0.0', current_port), RequestHandler, False)
+            server.allow_reuse_address = True
+            server.server_bind()
+            server.server_activate()
         except OSError:
             current_port += 1
         else:
