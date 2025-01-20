@@ -1,6 +1,7 @@
 use std::{rc::Rc, sync::Arc};
 
 use dominator::html;
+use crate::styles::container;
 use futures::channel::mpsc;
 use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
 use once_cell::sync::Lazy;
@@ -11,6 +12,7 @@ mod sidebar;
 mod workspace;
 mod vfs;
 mod contextmenu;
+mod styles;
 
 enum WorkspaceCommand {
     OpenFile(Rc<vfs::File>),
@@ -48,15 +50,11 @@ pub async fn main() {
     });
 
     let outer = html!("div", {
-        .class("grid")
-        .class("grid-cols-[auto_1fr]")
-        .class("gap-0")
+        .apply(container)
         .child(html!("div", {
-            .class("col-span-1")
             .child(Sidebar::render(&sidebar, &workspace_command_tx))
         }))
         .child(html!("div", {
-            .class("col-span-1")
             .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
         }))
     });
