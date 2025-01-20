@@ -126,8 +126,10 @@ fn render_contents(
                 })
                 .child(html!("div", {
                     .class("icon_text")
-                    .class("inline-flex")
-                    .style("cursor", "pointer")
+                    .class("grid")
+                    .class("grid-cols-[auto_1fr]")
+                    .class("p-[2px]")
+                    .class("cursor-pointer")
                     .event(clone!(expanded => move |event: events::MouseDown| {
                         // left click to expand directory
                         let rename = RENAME.with(|rename| rename.get_cloned().is_some());
@@ -215,8 +217,10 @@ fn render_contents(
             })
             .child(html!("div", {
                 .class("icon_text")
-                .class("inline-flex")
-                .style("cursor", "pointer")
+                .class("grid")
+                .class("grid-cols-[auto_1fr]")
+                .class("p-[2px]")
+                .class("cursor-pointer")
                 .event(clone!(workspace_command_tx, file => move |event: events::MouseDown| {
                     // left-click to open file in workspace
                     let rename = RENAME.with(|rename| rename.get_cloned().is_some());
@@ -352,8 +356,10 @@ impl Explorer {
                     })
                     .child(html!("div", {
                         .class("icon_text")
-                        .class("inline-flex")
-                        .style("cursor", "pointer")
+                        .class("grid")
+                        .class("grid-cols-[auto_1fr]")
+                        .class("p-[2px]")
+                        .class("cursor-pointer")
                         .event(clone!(expanded => move |event: events::MouseDown| {
                             // left-click to expand directory
                             let rename = RENAME.with(|rename| rename.get_cloned().is_some());
