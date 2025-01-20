@@ -24,4 +24,16 @@
     .context-menu-option {
         @apply pl-5 text-[0.9rem] pt-0.5 bg-inherit hover:bg-coreblue hover:rounded hover:text-white cursor-pointer;
     }
+
+    .cm-scroller {
+        @apply overflow-auto;
+    }
+    
+    .cm-gutter {
+        @apply bg-white;
+    }
+    
+    .cm-gutters {
+        border-right: 0px !important;
+    }
 }
