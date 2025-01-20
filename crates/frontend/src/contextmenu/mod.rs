@@ -15,7 +15,6 @@ pub struct ContextMenu {
     pub target: Target,
 }
 
-
 impl ContextMenu {
     pub fn new(position: (i32, i32), target: Target) -> Self {
         Self {
@@ -29,18 +28,13 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-                .class("menu")
-                .class("has-background-light")
-                .style("position", "absolute")
-                .style("border", "1px solid black")
-                .style("padding", "10px")
-                .style("z-index", "1000")
+                .class("context-menu")
                 .style("left", &format!("{}px", context_menu.position.0)) // X position
                 .style("top", &format!("{}px", context_menu.position.1)) // Y position
                 .children(&mut [
                     html!("div", {
                         .text("New Folder")
-                        .style("cursor", "pointer")
+                        .class("context-menu-option")
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"New Folder Created".into());
                             context_menu.add_folder();
@@ -48,7 +42,8 @@ impl ContextMenu {
                     }),
                     html!("div", {
                         .text("New File")
-                        .style("cursor", "pointer")
+                        .class("context-menu-option")
+                        .class("cursor-pointer")
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"New File Created".into());
                             context_menu.add_file();
@@ -56,7 +51,8 @@ impl ContextMenu {
                     }),
                     html!("div", {
                         .text("Rename Folder")
-                        .style("cursor", "pointer")
+                        .class("context-menu-option")
+                        .class("cursor-pointer")
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"Renaming Folder".into());
                             if let Target::Directory(dir) = &context_menu.target  {
@@ -74,18 +70,14 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .class("menu")
-            .class("has-background-light")
-            .style("position", "absolute")
-            .style("border", "1px solid black")
-            .style("padding", "10px")
-            .style("z-index", "1000")
+            .class("context-menu")
             .style("left", &format!("{}px", context_menu.position.0)) // X position
             .style("top", &format!("{}px", context_menu.position.1)) // Y position
             .children(&mut [
                 html!("div", {
                     .text("Rename File")
-                    .style("cursor", "pointer")
+                    .class("context-menu-option")
+                    .class("cursor-pointer")
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
                         web_sys::console::log_1(&"Renaming File".into());
                         if let Target::File(file) = &context_menu.target  {

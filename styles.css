@@ -16,4 +16,12 @@
     .content {
         @apply text-[2em] mb-[0.5em];
     }
+
+    .context-menu {
+        @apply bg-white absolute z-[1000] w-60 p-1 rounded shadow-md border-transparent;
+    }
+    
+    .context-menu-option {
+        @apply pl-5 text-[0.9rem] pt-0.5 bg-inherit hover:bg-coreblue hover:rounded hover:text-white cursor-pointer;
+    }
 }
