@@ -1,5 +1,7 @@
 use dominator::{html, svg, Dom};
-use futures_signals::signal::{self, Signal, SignalExt};
+use futures_signals::signal::{Signal, SignalExt};
+
+use crate::styles::{menu_btn_search, panel, panel_title, panel_title_container, panel_title_text};
 
 const ICON_SVG_PATH: &str =
     "M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,\
@@ -20,9 +22,8 @@ impl Search {
     pub fn icon(&self, active: impl Signal<Item = bool> + 'static) -> Dom {
         let active = active.broadcast();
         svg!("svg", {
+            .apply(|dom| menu_btn_search(dom, &active)) 
             .attr("viewBox", "0 0 24 24")
-            .class_signal("fill-white", active.signal())
-            .class_signal("fill-darkgray", signal::not(active.signal()))
             .child(svg!("path", {
                 .attr("d", ICON_SVG_PATH)
             }))
@@ -31,22 +32,13 @@ impl Search {
 
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
-            .class("block")
-            .class("bg-lightgray")
-            .class("h-screen")
+            .apply(panel)
             .child(html!("div", {
-                .class("block")
-                .class("m-0")
-                .class("h-[35px]")
+                .apply(panel_title_container)
                 .child(html!("div", {
-                    .class("icon_text")
-                    .class("pl-6")
-                    .class("pt-2")
+                    .apply(panel_title)
                     .child(html!("span", {
-                        .class("text-darkgray")
-                        .class("text-[0.70em]")
-                        .class("tracking-tight")
-                        .class("uppercase")
+                        .apply(panel_title_text)
                         .text("Search")
                     }))
                 }))
