@@ -110,3 +110,27 @@ pub fn vertical_resizer(
 }
 
 // WORKSPACE STYLES
+
+// CONTEXTMENU STYLES
+
+pub fn contextmenu(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("bg-white")
+        .class("absolute")
+        .class("z-[1000]")
+        .class("w-60")
+        .class("p-1")
+        .class("rounded")
+        .class("shadow-md")
+        .class("border-transparent")
+}
+
+pub fn contextmenu_option(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("text-[0.9rem]")
+        .class("pl-5")
+        .class("pt-0.5")
+        .class("bg-inherit")
+        .class("hover:bg-coreblue")
+        .class("hover:rounded")
+        .class("hover:text-white")
+        .class("cursor-pointer")
+}

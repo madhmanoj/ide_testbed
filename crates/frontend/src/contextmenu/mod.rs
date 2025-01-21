@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
 use crate::sidebar::explorer::RENAME;
+use crate::styles::{contextmenu, contextmenu_option};
 use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
 #[derive(Clone)]
 pub enum Target {
@@ -28,22 +29,21 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-                .class("context-menu")
+                .apply(contextmenu)
                 .style("left", &format!("{}px", context_menu.position.0)) // X position
                 .style("top", &format!("{}px", context_menu.position.1)) // Y position
                 .children(&mut [
                     html!("div", {
                         .text("New Folder")
-                        .class("context-menu-option")
+                        .apply(contextmenu_option)
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"New Folder Created".into());
                             context_menu.add_folder();
                         }))
-                    }),
+                    }), 
                     html!("div", {
                         .text("New File")
-                        .class("context-menu-option")
-                        .class("cursor-pointer")
+                        .apply(contextmenu_option)
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"New File Created".into());
                             context_menu.add_file();
@@ -51,8 +51,7 @@ impl ContextMenu {
                     }),
                     html!("div", {
                         .text("Rename Folder")
-                        .class("context-menu-option")
-                        .class("cursor-pointer")
+                        .apply(contextmenu_option)
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"Renaming Folder".into());
                             if let Target::Directory(dir) = &context_menu.target  {
@@ -70,14 +69,13 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .class("context-menu")
+            .apply(contextmenu)
             .style("left", &format!("{}px", context_menu.position.0)) // X position
             .style("top", &format!("{}px", context_menu.position.1)) // Y position
             .children(&mut [
                 html!("div", {
                     .text("Rename File")
-                    .class("context-menu-option")
-                    .class("cursor-pointer")
+                    .apply(contextmenu_option)
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
                         web_sys::console::log_1(&"Renaming File".into());
                         if let Target::File(file) = &context_menu.target  {
