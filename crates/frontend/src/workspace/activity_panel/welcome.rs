@@ -3,6 +3,8 @@ use std::rc::Rc;
 use dominator::{html, svg, Dom};
 use futures_signals::signal::{self, Signal, SignalExt};
 
+use crate::styles::welcome_icon;
+
 const MAX_CONTENT_WIDTH: u32 = 850;
 
 pub struct Welcome {}
@@ -65,9 +67,8 @@ impl Welcome {
             10C19.1 10 20 10.9 20 12S19.1 14 18 14 16 13.1 16 12 16.9 10 18 10M18 \
             4C19.1 4 20 4.9 20 6S19.1 8 18 8 16 7.1 16 6 16.9 4 18 4Z";
         svg!("svg", {
-            .attr("height", "1.5em")
-            .attr("viewBox", "0 0 24 24")
-            .class("fill-coreblue")
+            .apply(welcome_icon)
+            .attr("viewBox", "0 0 27 27")
             .child(svg!("path", {
                 .attr("d", PATH)
             }))

@@ -7,34 +7,27 @@ use futures_signals::signal_vec::SignalVecExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use crate::styles::{console, console_message_area, console_title, console_title_container, console_title_text};
+
 #[derive(Default)]
 pub struct Console {}
 
 impl Console {
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
-            .class("h-full")
-            .class("bg-lightgray")
+            .apply(console)
             .child(html!("div", {
-                .class("block")
-                .class("p-3")
-                .class("m-0")
+                .apply(console_title_container)
                 .child(html!("div", {
-                    .class("icon-text")
+                    .apply(console_title)
                     .child(html!("span", {
-                        .class("text-xs")
-                        .class("uppercase")
-                        .style("letter-spacing", ".1em")
+                        .apply(console_title_text)
                         .text("Log messages")
                     }))
                 }))
             }))
             .child(html!("div", {
-                .class("p-2")
-                .class("block")
-                .style("overflow-y", "scroll")
-                .style("height", "calc(100% - 40px)") // 40 px for the block above
-                .class("bg-white")
+                .apply(console_message_area)
                 .children_signal_vec(crate::GLOBAL_LOG.with(|messages| messages
                     .signal_vec_cloned().map(render_entry)))
                 .scroll_top_signal(crate::GLOBAL_LOG.with(|messages| messages

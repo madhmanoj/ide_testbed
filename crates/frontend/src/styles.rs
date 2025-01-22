@@ -1,6 +1,9 @@
 use dominator::DomBuilder;
 use futures_signals::signal::{self, Broadcaster, Mutable, Signal, SignalExt};
 use web_sys::{HtmlElement, HtmlInputElement, SvgElement};
+
+// MAIN CONTAINER
+
 pub fn container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("grid")
         .class("grid-cols-[auto_1fr]")
@@ -110,6 +113,124 @@ pub fn vertical_resizer(
 }
 
 // WORKSPACE STYLES
+
+pub fn workspace(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("grid")
+        .class("grid-rows-[1fr_auto_auto]")
+        .class("gap-0")
+        .class("h-full")
+}
+
+pub fn activity_area(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("grid")
+        .class("grid-rows-[auto_1fr]")
+        .class("gap-0")
+        .class("h-full")
+}
+
+pub fn tab_bar_container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("row-span-1")
+        .class("bg-lightgray")
+        .class("h-[35px]")
+}
+
+pub fn tab_bar(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("inline-flex")
+        .class("h-full")
+        .class("gap-0")
+}
+
+pub fn tab_container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("h-full")
+        .class("w-[110px]")
+}
+
+pub fn tab(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("block")
+        .class("h-full")
+        .class("gap-1")
+        .class("pt-1.5w")
+        .class("cursor-pointer")
+}
+
+pub fn tab_content(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("icon_text")
+        .class("inline-flex")
+}
+
+pub fn tab_icon_default(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("icon")
+}
+
+pub fn tab_icon(
+    dom: DomBuilder<HtmlElement>,
+    mouse_over_close: &Mutable<bool>,
+    mouse_over: &Mutable<bool>
+) -> DomBuilder<HtmlElement> {
+    dom.class("icon")
+        .class_signal("bg-lightgray", mouse_over_close.signal())
+        .class_signal("invisible", signal::not(mouse_over.signal()))
+}
+
+pub fn welcome_icon(dom: DomBuilder<SvgElement>) -> DomBuilder<SvgElement> {
+    dom.class("h-[1.5em]")
+        .class("fill-coreblue")
+}
+
+pub fn activity_editor(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("h-full")
+}
+
+pub fn horizontal_resizer(
+    dom: DomBuilder<HtmlElement>,
+    height: &u32,
+    active: &Mutable<bool>,
+    hover: &Mutable<bool>
+) -> DomBuilder<HtmlElement> {
+    dom.style("cursor", "ns-resize")
+        .style("height", &format!("{height}px"))
+        .class_signal("bg-lightgray",
+            signal::not(signal::or(active.signal(),hover.signal())))
+        .class_signal("bg-coreblue",
+            signal::or(active.signal(), hover.signal()))
+}
+
+pub fn console_container(
+    dom: DomBuilder<HtmlElement>,
+    height: &Mutable<u32>
+) -> DomBuilder<HtmlElement> {
+    dom.style_signal("height", height.signal()
+        .map(|height| format!("{height}px")))
+}
+
+pub fn console(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("h-full")
+        .class("bg-lightgray")
+}
+
+pub fn console_title_container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("block")
+        .class("p-3")
+        .class("m-0")
+}
+
+pub fn console_title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("icon-text")
+}
+
+pub fn console_title_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("text-xs")
+        .class("uppercase")
+        .class("tracking-widest")
+}
+
+pub fn console_message_area(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("p-2")
+        .class("block")
+        .style("overflow-y", "scroll")
+        .style("height", "calc(100% - 40px)") // 40 px for the block above
+        .class("bg-white")
+}
 
 // CONTEXTMENU STYLES
 

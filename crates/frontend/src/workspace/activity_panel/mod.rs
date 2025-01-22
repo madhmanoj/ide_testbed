@@ -4,6 +4,8 @@ use dominator::{clone, events, svg, Dom, EventOptions, html};
 use futures::StreamExt;
 use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 
+use crate::styles::{activity_area, activity_editor, tab, tab_bar, tab_bar_container, tab_container, tab_content, tab_icon, tab_icon_default};
+
 pub mod editor;
 pub mod welcome;
 
@@ -59,11 +61,7 @@ impl Activity {
         }));
 
         html!("div", {
-            .class("block")
-            .class("py-1")
-            .class("px-1")
-            .class("gap-1")
-            .style("cursor", "pointer")
+            .apply(tab)
             .event(clone!(mouse_over => move |_: events::PointerOver| {
                 mouse_over.set_neq(true);
             }))
@@ -75,17 +73,16 @@ impl Activity {
             }))
             .class_signal("bg-white",signal::or(is_active, mouse_over.signal()))
             .child(html!("div", {
-                .class("icon_text")
-                .class("inline-flex")
+                .apply(tab_content)
                 .child(html!("div", {
-                    .class("icon")
+                    .apply(tab_icon_default)
                     .child(this.icon())
                 }))
                 .child(this.label())
                 // HACK DO NOT SHOW THE CLOSE ICON 
                 .apply_if(matches!(**this, Activity::Editor(_)), |dom| {
                     dom.child(html!("div", {
-                        .class("icon")
+                        .apply(|dom| tab_icon(dom, &mouse_over_close, &mouse_over))
                         .event(clone!(mouse_over_close => move |_: events::PointerOver| {
                             mouse_over_close.set_neq(true);
                         }))
@@ -101,8 +98,6 @@ impl Activity {
                                 *active_activity = panel.activities.lock_ref().first().cloned();
                             }
                         }))
-                        .class_signal("bg-lightgray", mouse_over_close.signal())
-                        .class_signal("invisible", signal::not(mouse_over.signal()))
                         .child(close_icon)
                     }))
                 })
@@ -150,10 +145,7 @@ impl ActivityPanel {
         let height = height.broadcast();
 
         html!("div", {
-            .class("grid")
-            .class("grid-rows-[auto_1fr]")
-            .class("gap-0")
-            .class("h-full")
+            .apply(activity_area)
             .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
                 match command {
                     crate::WorkspaceCommand::OpenFile(file) => {
@@ -180,16 +172,12 @@ impl ActivityPanel {
             })))
             // tabs take up one full line
             .child(html!("div", {
-                .class("row-span-1")
-                .class("bg-lightgray")
-                .class("h-[35px]")
+                .apply(tab_bar_container)
                 .child(html!("div", {
-                    .class("inline-flex")
-                    .class("gap-0")
+                    .apply(tab_bar)
                     .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
                         html!("div", {
-                            .class("h-full")
-                            .class("w-[110px]")
+                            .apply(tab_container)
                             .child(Activity::render_tab(&activity, &this))
                         })
                     })))
@@ -199,8 +187,7 @@ impl ActivityPanel {
                 .signal_cloned()
                 .map(move |activity: Option<Rc<Activity>>| activity
                     .map(clone!(width, height => move |activity| html!("div", {
-                        .class("row-span-1")
-                        .class("h-full")
+                        .apply(activity_editor)
                         .child_signal(Activity::render(
                             &activity,
                             width.signal(),

@@ -1,7 +1,9 @@
 use std::rc::Rc;
 
 use dominator::{clone, events, Dom, EventOptions, html};
-use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}};
+use futures_signals::{map_ref, signal::{Mutable, Signal}};
+
+use crate::styles::{console_container, horizontal_resizer, workspace};
 
 pub mod console;
 pub mod activity_panel;
@@ -44,13 +46,10 @@ impl Workspace {
             map_ref!(height, console_height => height.saturating_sub(console_height + RESIZER_HEIGHT));
 
         html!("div", {
-            .class("grid")
-            .class("grid-rows-[1fr_auto_auto]")
-            .class("gap-0")
-            .class("h-full")
+            .apply(workspace)
+
             // activity area
             .child(html!("div", {
-                .class("row-span-1")
                 // .style_signal("height", activity_panel_height
                 //     .map(|height| format!("{height}px")))
                 .child(ActivityPanel::render(&this.activity_panel, workspace_command_rx, width, activity_panel_height))
@@ -58,14 +57,7 @@ impl Workspace {
 
             // resizer
             .child(html!("div", {
-                .class("row-span-1")
-                .style("cursor", "ns-resize")
-                .style("height", &format!("{RESIZER_HEIGHT}px"))
-                .class_signal("bg-lightgray",
-                    signal::not(signal::or(this.resize_active.signal(), this.resizer_hover.signal())))
-                .class_signal("bg-coreblue",
-                    signal::or(this.resize_active.signal(), this.resizer_hover.signal()))
-                
+                .apply(|dom| horizontal_resizer(dom, &RESIZER_HEIGHT, &this.resize_active, &this.resizer_hover))
                 .event_with_options(&EventOptions::preventable(),
                     clone!(this => move |ev: events::PointerDown| {
                     this.resize_active.set_neq(true);
@@ -113,9 +105,7 @@ impl Workspace {
             
             // terminal
             .child(html!("div", {
-                .class("row-span-1")
-                .style_signal("height", this.console_height.signal()
-                    .map(|height| format!("{height}px")))
+                .apply(|dom| console_container(dom, &this.console_height))
                 .child(this.console.render())
             }))
         })
