@@ -2,12 +2,11 @@ use std::{sync::Arc, time::{Duration, UNIX_EPOCH}};
 
 use chrono::DateTime;
 use dominator::{html, Dom};
-use dominator_bulma::tag;
 use futures_signals::signal_vec::SignalVecExt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::styles::{console, console_message_area, console_title, console_title_container, console_title_text};
+use crate::styles;
 
 #[derive(Default)]
 pub struct Console {}
@@ -15,19 +14,19 @@ pub struct Console {}
 impl Console {
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
-            .apply(console)
+            .apply(styles::console::body)
             .child(html!("div", {
-                .apply(console_title_container)
+                .apply(styles::console::title_container)
                 .child(html!("div", {
-                    .apply(console_title)
+                    .apply(styles::console::title)
                     .child(html!("span", {
-                        .apply(console_title_text)
+                        .apply(styles::console::title_text)
                         .text("Log messages")
                     }))
                 }))
             }))
             .child(html!("div", {
-                .apply(console_message_area)
+                .apply(styles::console::message_area)
                 .children_signal_vec(crate::GLOBAL_LOG.with(|messages| messages
                     .signal_vec_cloned().map(render_entry)))
                 .scroll_top_signal(crate::GLOBAL_LOG.with(|messages| messages
@@ -47,7 +46,7 @@ fn render_entry(message: Arc<str>) -> Dom {
         })
         .map(|(category, timestamp, node, message)| {
             html!("p", {
-                .class("p-1")
+                .apply(styles::console::entry)
                 .child(render_category(category.as_str()))
                 .child(render_timestamp(timestamp.as_str()))
                 .child(render_node(node.as_str()))
@@ -59,15 +58,15 @@ fn render_entry(message: Arc<str>) -> Dom {
 }
 
 fn render_message(node: &str) -> Dom {
-    tag!("is-white", {
-        .class("is-size-7")
+    html!("div", {
+        .apply(styles::console::message)
         .text(&node)
     })
 }
 
 fn render_node(node: &str) -> Dom {
-    tag!("is-white", {
-        .class("is-size-7")
+    html!("div", {
+        .apply(styles::console::node)
         .text(&node)
     })
 }
@@ -77,30 +76,27 @@ fn render_timestamp(timestamp: &str) -> Dom {
         let datetime = DateTime::<chrono::Local>::from(UNIX_EPOCH + duration)
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
-        tag!("is-white", {
-            .class("is-size-7")
+        html!("div", {
+            .apply(styles::console::timestamp)
             .text(&datetime)
         })
     }
     else {
-        tag!("is-white", {
-            .class("is-size-7")
+        html!("div", {
+            .apply(styles::console::timestamp)
             .text(&timestamp)
         })
     }
 }
 
 fn render_category(category: &str) -> Dom {
-    tag!("is-light", {
+    html!("div", {
         .apply(|builder| match category {
-            "INFO" => builder.text("info").class("is-success"),
-            "WARN" => builder.text("warn").class("is-warning"),
-            "ERROR" => builder.text("error").class("is-danger"),
+            "INFO" => builder.text("info").apply(styles::console::success),
+            "WARN" => builder.text("warn").apply(styles::console::warning),
+            "ERROR" => builder.text("error").apply(styles::console::error),
             _ => builder.text("unknown")
         })
-        .class("is-size-7")
-        .class("is-uppercase")
-        .style("min-width", "65px")
-        .style("letter-spacing", ".1em")
+        .apply(styles::console::category)
     })
 }

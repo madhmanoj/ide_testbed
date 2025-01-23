@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use dominator::{clone, events, Dom, EventOptions, html};
-use crate::styles::{menu, menu_btn, panel_container, sidebar, sidebar_menu_container, vertical_resizer};
+use crate::styles;
 use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}};
 
 pub mod explorer;
@@ -82,18 +82,18 @@ impl Sidebar {
 
     pub fn render(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> Dom {
         html!("div", {
-            .apply(sidebar)
+            .apply(styles::sidebar)
 
             // menu
             .child(html!("div", {
-                .apply(|dom| sidebar_menu_container(dom, &MENU_SIZE_PX))    
+                .apply(styles::menu::container)    
                 .child(Self::render_menu(this))
             }))
             
             // panel
             .child_signal(this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
                 panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
-                    .apply(|dom| panel_container(dom, &this.panel_size))
+                    .apply(|dom| styles::panel::container(dom, &this.panel_size))
                     .child(panel.render(&workspace_command_tx))
                 })))
             })))
@@ -101,7 +101,7 @@ impl Sidebar {
             // resizer
             .child_signal(this.active_panel.signal_cloned().map(clone!(this => move |panel| {
                 panel.map(clone!(this => move |_| html!("div", {
-                    .apply(|dom| vertical_resizer(dom, &RESIZER_PX, &this.resize_active, &this.resizer_hover))
+                    .apply(|dom| styles::vertical_resizer(dom, &this.resize_active, &this.resizer_hover))
                     .event_with_options(&EventOptions::preventable(),
                         clone!(this => move |ev: events::PointerDown| {
                         this.resize_active.set_neq(true);
@@ -159,7 +159,7 @@ impl Sidebar {
                 let active = signal::or(active, mouse_over.signal());
 
                 html!("div", {
-                    .apply(menu_btn)
+                    .apply(styles::menu::button)
                     .attr("title", panel.tooltip())
                     .child(panel.icon(active))
                     .event(clone!(mouse_over => move |_: events::PointerOver| {
@@ -183,7 +183,7 @@ impl Sidebar {
             }));
 
         html!("div", {
-            .apply(menu)
+            .apply(styles::menu::body)
             .children(buttons)
         })
     }

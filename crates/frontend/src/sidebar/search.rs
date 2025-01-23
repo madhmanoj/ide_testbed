@@ -1,7 +1,7 @@
 use dominator::{html, svg, Dom};
 use futures_signals::signal::{Signal, SignalExt};
 
-use crate::styles::{menu_btn_search, panel, panel_title, panel_title_container, panel_title_text};
+use crate::styles;
 
 const ICON_SVG_PATH: &str =
     "M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,\
@@ -22,7 +22,7 @@ impl Search {
     pub fn icon(&self, active: impl Signal<Item = bool> + 'static) -> Dom {
         let active = active.broadcast();
         svg!("svg", {
-            .apply(|dom| menu_btn_search(dom, &active)) 
+            .apply(|dom| styles::menu::button_search(dom, &active)) 
             .attr("viewBox", "0 0 24 24")
             .child(svg!("path", {
                 .attr("d", ICON_SVG_PATH)
@@ -32,13 +32,13 @@ impl Search {
 
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
-            .apply(panel)
+            .apply(styles::panel::body)
             .child(html!("div", {
-                .apply(panel_title_container)
+                .apply(styles::panel::title_container)
                 .child(html!("div", {
-                    .apply(panel_title)
+                    .apply(styles::panel::title)
                     .child(html!("span", {
-                        .apply(panel_title_text)
+                        .apply(styles::panel::title_text)
                         .text("Search")
                     }))
                 }))

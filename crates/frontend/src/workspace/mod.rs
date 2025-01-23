@@ -3,13 +3,13 @@ use std::rc::Rc;
 use dominator::{clone, events, Dom, EventOptions, html};
 use futures_signals::{map_ref, signal::{Mutable, Signal}};
 
-use crate::styles::{console_container, horizontal_resizer, workspace};
+use crate::styles;
 
 pub mod console;
 pub mod activity_panel;
 
 const DEFAULT_CONSOLE_HEIGHT: u32 = 200;
-const RESIZER_HEIGHT: u32 = 4;
+const RESIZER_HEIGHT: u32 = 2;
 
 pub struct Workspace {
     activity_panel: Rc<activity_panel::ActivityPanel>,
@@ -46,7 +46,7 @@ impl Workspace {
             map_ref!(height, console_height => height.saturating_sub(console_height + RESIZER_HEIGHT));
 
         html!("div", {
-            .apply(workspace)
+            .apply(styles::workspace)
 
             // activity area
             .child(html!("div", {
@@ -57,7 +57,7 @@ impl Workspace {
 
             // resizer
             .child(html!("div", {
-                .apply(|dom| horizontal_resizer(dom, &RESIZER_HEIGHT, &this.resize_active, &this.resizer_hover))
+                .apply(|dom| styles::horizontal_resizer(dom, &this.resize_active, &this.resizer_hover))
                 .event_with_options(&EventOptions::preventable(),
                     clone!(this => move |ev: events::PointerDown| {
                     this.resize_active.set_neq(true);
@@ -105,7 +105,7 @@ impl Workspace {
             
             // terminal
             .child(html!("div", {
-                .apply(|dom| console_container(dom, &this.console_height))
+                .apply(|dom| styles::console::container(dom, &this.console_height))
                 .child(this.console.render())
             }))
         })

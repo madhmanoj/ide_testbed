@@ -2,16 +2,16 @@ use std::{pin::Pin, rc::Rc};
 
 use dominator::{clone, events, svg, Dom, EventOptions, html};
 use futures::StreamExt;
-use futures_signals::{signal::{self, Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
+use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 
-use crate::styles::{activity_area, activity_editor, tab, tab_bar, tab_bar_container, tab_container, tab_content, tab_icon, tab_icon_default};
+use crate::styles;
 
 pub mod editor;
 pub mod welcome;
 
 const TAB_HEIGHT: u32 = 35;
 
-enum Activity {
+pub enum Activity {
     Editor(Rc<editor::Editor>),
     Welcome(Rc<welcome::Welcome>),
 }
@@ -61,7 +61,7 @@ impl Activity {
         }));
 
         html!("div", {
-            .apply(tab)
+            .apply(|dom| styles::tab::body(dom, is_active, &mouse_over))
             .event(clone!(mouse_over => move |_: events::PointerOver| {
                 mouse_over.set_neq(true);
             }))
@@ -71,18 +71,17 @@ impl Activity {
             .event(clone!(panel, this => move |_: events::PointerDown| {                
                 panel.active_activity.set(Some(this.clone()))
             }))
-            .class_signal("bg-white",signal::or(is_active, mouse_over.signal()))
             .child(html!("div", {
-                .apply(tab_content)
+                .apply(styles::tab::content)
                 .child(html!("div", {
-                    .apply(tab_icon_default)
+                    .apply(styles::tab::icon_default)
                     .child(this.icon())
                 }))
                 .child(this.label())
                 // HACK DO NOT SHOW THE CLOSE ICON 
                 .apply_if(matches!(**this, Activity::Editor(_)), |dom| {
                     dom.child(html!("div", {
-                        .apply(|dom| tab_icon(dom, &mouse_over_close, &mouse_over))
+                        .apply(|dom| styles::tab::icon(dom, &mouse_over_close, &mouse_over))
                         .event(clone!(mouse_over_close => move |_: events::PointerOver| {
                             mouse_over_close.set_neq(true);
                         }))
@@ -145,7 +144,7 @@ impl ActivityPanel {
         let height = height.broadcast();
 
         html!("div", {
-            .apply(activity_area)
+            .apply(styles::activity::area)
             .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
                 match command {
                     crate::WorkspaceCommand::OpenFile(file) => {
@@ -172,12 +171,12 @@ impl ActivityPanel {
             })))
             // tabs take up one full line
             .child(html!("div", {
-                .apply(tab_bar_container)
+                .apply(styles::tab::bar_container)
                 .child(html!("div", {
-                    .apply(tab_bar)
+                    .apply(styles::tab::bar)
                     .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
                         html!("div", {
-                            .apply(tab_container)
+                            .apply(styles::tab::container)
                             .child(Activity::render_tab(&activity, &this))
                         })
                     })))
@@ -187,7 +186,7 @@ impl ActivityPanel {
                 .signal_cloned()
                 .map(move |activity: Option<Rc<Activity>>| activity
                     .map(clone!(width, height => move |activity| html!("div", {
-                        .apply(activity_editor)
+                        .apply(styles::activity::container)
                         .child_signal(Activity::render(
                             &activity,
                             width.signal(),
@@ -202,11 +201,7 @@ impl ActivityPanel {
         height: impl Signal<Item = u32> + 'static
     ) -> Dom {
         html!("div", {
-            .style_signal("height", height.map(|height| format!("{height}px")))
-            .style("background-image", "url('images/background.png')")
-            .style("background-repeat", "no-repeat")
-            .style("background-position", "center")
-            .style("background-size", "auto 40%")
+            .apply(|dom| styles::activity::background(dom, height))
         })
     }
 }

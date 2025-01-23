@@ -16,6 +16,10 @@
     .content {
         @apply text-[2em] mb-[0.5em];
     }
+
+    .tag {
+        @apply items-center rounded-md inline-flex h-[2em] text-xs justify-center leading-[1.5] pr-[0.75em] pl-[0.75em] whitespace-nowrap;
+    }
     
     .cm-scroller {
         @apply overflow-auto;

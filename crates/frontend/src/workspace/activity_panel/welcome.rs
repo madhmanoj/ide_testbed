@@ -3,7 +3,7 @@ use std::rc::Rc;
 use dominator::{html, svg, Dom};
 use futures_signals::signal::{self, Signal, SignalExt};
 
-use crate::styles::welcome_icon;
+use crate::styles::{self, activity::{welcome_2, welcome_3}};
 
 const MAX_CONTENT_WIDTH: u32 = 850;
 
@@ -24,25 +24,15 @@ impl Welcome {
             .broadcast();
       
         let dom = html!("div", {
-            .class("justify-center")
-            .class("gap-0")
-            .style("overflow-y", "scroll")
-            .style_signal("height", height.map(|height| format!("{height}px")))
+            .apply(|dom| styles::activity::welcome_1(dom, height))
             .child(html!("div", {
-                .class("place-items-center")
-                .class("h-full")
+                .apply(welcome_2)
                 .child(html!("div", {
-                    .class("block")
-                    .class("h-full")
-                    .class("place-content-center")
-                    .class("py-6")
-                    .style_signal("max-width", content_max_width.signal_ref(|width| format!("{width}px")))
-                    .child(html!("div", {
+                    .apply(|dom| welcome_3(dom, content_max_width))
+                    .child(html!("h1", {
                         .class("content")
-                        .child(html!("h1", {
-                            .text("Web-based IDE")
-                        })) 
-                    }))
+                        .text("Web-based IDE")
+                    })) 
                 }))
             }))
         });
@@ -67,7 +57,7 @@ impl Welcome {
             10C19.1 10 20 10.9 20 12S19.1 14 18 14 16 13.1 16 12 16.9 10 18 10M18 \
             4C19.1 4 20 4.9 20 6S19.1 8 18 8 16 7.1 16 6 16.9 4 18 4Z";
         svg!("svg", {
-            .apply(welcome_icon)
+            .apply(styles::activity::welcome_icon)
             .attr("viewBox", "0 0 27 27")
             .child(svg!("path", {
                 .attr("d", PATH)
