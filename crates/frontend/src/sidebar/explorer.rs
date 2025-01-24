@@ -91,7 +91,7 @@ fn render_contents(
         .map(clone!(workspace_command_tx, context_menu => move |directory| {
             let expanded = Mutable::new(true);
             html!("li", {
-                .apply(styles::vfs_item_container)
+                .apply(styles::vfs_item_list)
                 .attr("draggable", "true")
                 .event(clone!(directory => move |_: events::DragStart| {
                     DRAGGED_ITEM.with(|dragged| {
@@ -193,7 +193,7 @@ fn render_contents(
         .sort_by_cloned(|left_file, right_file|
             left_file.name.lock_ref().cmp(&*right_file.name.lock_ref()))
         .map(clone!(workspace_command_tx => move |file| html!("li", {
-            .apply(styles::vfs_item_container)
+            .apply(styles::vfs_item_list)
             .attr("draggable", "true")
             .event(clone!(file => move |_: events::DragStart| {
                 DRAGGED_ITEM.with(|dragged| {
@@ -295,13 +295,10 @@ impl Explorer {
         html!("div", {
             .apply(styles::panel::body)
             .child(html!("div", {
-                .apply(styles::panel::title_container)
-                .child(html!("div", { 
-                    .apply(styles::panel::title)
-                    .child(html!("span", {
-                        .apply(styles::panel::title_text)
-                        .text("Explorer")
-                    }))
+                .apply(styles::panel::title)
+                .child(html!("span", {
+                    .apply(styles::panel::title_text)
+                    .text("Explorer")
                 }))
             }))
             // project listing

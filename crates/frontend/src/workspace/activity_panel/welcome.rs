@@ -3,7 +3,7 @@ use std::rc::Rc;
 use dominator::{html, svg, Dom};
 use futures_signals::signal::{self, Signal, SignalExt};
 
-use crate::styles::{self, activity::{welcome_2, welcome_3}};
+use crate::styles;
 
 const MAX_CONTENT_WIDTH: u32 = 850;
 
@@ -24,16 +24,13 @@ impl Welcome {
             .broadcast();
       
         let dom = html!("div", {
-            .apply(|dom| styles::activity::welcome_1(dom, height))
+            .apply(|dom| styles::activity::welcome_container(dom, height))
             .child(html!("div", {
-                .apply(welcome_2)
-                .child(html!("div", {
-                    .apply(|dom| welcome_3(dom, content_max_width))
-                    .child(html!("h1", {
-                        .class("content")
-                        .text("Web-based IDE")
-                    })) 
-                }))
+                .apply(|dom| styles::activity::welcome_page(dom, content_max_width))
+                .child(html!("h1", {
+                    .class("content")
+                    .text("Web-based IDE")
+                })) 
             }))
         });
         signal::always(dom.into())

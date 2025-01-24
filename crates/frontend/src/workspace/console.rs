@@ -16,13 +16,10 @@ impl Console {
         html!("div", {
             .apply(styles::console::body)
             .child(html!("div", {
-                .apply(styles::console::title_container)
-                .child(html!("div", {
-                    .apply(styles::console::title)
-                    .child(html!("span", {
-                        .apply(styles::console::title_text)
-                        .text("Log messages")
-                    }))
+                .apply(styles::console::title)
+                .child(html!("span", {
+                    .apply(styles::console::title_text)
+                    .text("Log messages")
                 }))
             }))
             .child(html!("div", {
@@ -46,7 +43,7 @@ fn render_entry(message: Arc<str>) -> Dom {
         })
         .map(|(category, timestamp, node, message)| {
             html!("p", {
-                .apply(styles::console::entry)
+                .class("p-1")
                 .child(render_category(category.as_str()))
                 .child(render_timestamp(timestamp.as_str()))
                 .child(render_node(node.as_str()))

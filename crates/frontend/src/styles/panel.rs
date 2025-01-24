@@ -13,15 +13,12 @@ pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("h-screen")
 }
 
-pub fn title_container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+pub fn title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("block")
         .class("m-0")
         .class("h-[35px]")
-}
-
-pub fn title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("icon_text")
-        .class("pl-6")
+        .class("icon_text")
+        .class("pl-[1.625rem]")
         .class("pt-2")
 }
 

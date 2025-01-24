@@ -34,22 +34,17 @@ pub fn welcome_icon(dom: DomBuilder<SvgElement>) -> DomBuilder<SvgElement> {
         .class("fill-coreblue")
 }
 
-pub fn welcome_1(
+pub fn welcome_container(
     dom: DomBuilder<HtmlElement>,
     height: impl Signal<Item = u32> + 'static
 ) -> DomBuilder<HtmlElement> {
-    dom.class("justify-center")
+    dom.class("place-items-center")
         .class("gap-0")
         .style("overflow-y", "scroll")
         .style_signal("height", height.map(|height| format!("{height}px")))
 }
 
-pub fn welcome_2(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("place-items-center")
-        .class("h-full")
-}
-
-pub fn welcome_3(
+pub fn welcome_page(
     dom: DomBuilder<HtmlElement>,
     content_max_width: Broadcaster<Map<impl Signal<Item = u32> + 'static, impl FnMut(u32) -> u32 + 'static>>
 ) -> DomBuilder<HtmlElement> {

@@ -34,13 +34,10 @@ impl Search {
         html!("div", {
             .apply(styles::panel::body)
             .child(html!("div", {
-                .apply(styles::panel::title_container)
-                .child(html!("div", {
-                    .apply(styles::panel::title)
-                    .child(html!("span", {
-                        .apply(styles::panel::title_text)
-                        .text("Search")
-                    }))
+                .apply(styles::panel::title)
+                .child(html!("span", {
+                    .apply(styles::panel::title_text)
+                    .text("Search")
                 }))
             }))
         })

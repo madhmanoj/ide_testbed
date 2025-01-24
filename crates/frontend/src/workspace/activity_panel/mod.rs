@@ -171,16 +171,13 @@ impl ActivityPanel {
             })))
             // tabs take up one full line
             .child(html!("div", {
-                .apply(styles::tab::bar_container)
-                .child(html!("div", {
-                    .apply(styles::tab::bar)
-                    .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
-                        html!("div", {
-                            .apply(styles::tab::container)
-                            .child(Activity::render_tab(&activity, &this))
-                        })
-                    })))
-                }))
+                .apply(styles::tab::bar)
+                .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
+                    html!("div", {
+                        .apply(styles::tab::container)
+                        .child(Activity::render_tab(&activity, &this))
+                    })
+                })))
             }))
             .child_signal(this.active_activity
                 .signal_cloned()

@@ -29,9 +29,7 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-                .apply(styles::contextmenu)
-                .style("left", &format!("{}px", context_menu.position.0)) // X position
-                .style("top", &format!("{}px", context_menu.position.1)) // Y position
+                .apply(|dom| styles::contextmenu(dom, &context_menu.position.0, &context_menu.position.1))
                 .children(&mut [
                     html!("div", {
                         .text("New Folder")
@@ -69,9 +67,7 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .apply(styles::contextmenu)
-            .style("left", &format!("{}px", context_menu.position.0)) // X position
-            .style("top", &format!("{}px", context_menu.position.1)) // Y position
+            .apply(|dom| styles::contextmenu(dom, &context_menu.position.0, &context_menu.position.1))
             .children(&mut [
                 html!("div", {
                     .text("Rename File")

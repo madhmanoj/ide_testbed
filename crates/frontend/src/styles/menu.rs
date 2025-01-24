@@ -4,14 +4,11 @@ use web_sys::{HtmlElement, SvgElement};
 
 const MENU_SIZE_PX: u32 = 48;
 
-pub fn container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.style("width", &format!("{MENU_SIZE_PX}px"))
-}
-
 pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("block")
         .class("bg-mineshaft")
         .class("min-h-screen")
+        .style("width", &format!("{MENU_SIZE_PX}px"))
 }
 
 pub fn button(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {

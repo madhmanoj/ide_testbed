@@ -26,7 +26,7 @@ pub fn sidebar(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("gap-0")
 } 
 
-pub fn vfs_item_container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+pub fn vfs_item_list(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("pl-5")
         .class("pt-0")
 }
@@ -80,7 +80,11 @@ pub fn horizontal_resizer(
 
 // CONTEXTMENU STYLES
 
-pub fn contextmenu(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+pub fn contextmenu(
+    dom: DomBuilder<HtmlElement>,
+    x: &i32,
+    y: &i32
+) -> DomBuilder<HtmlElement> {
     dom.class("bg-white")
         .class("absolute")
         .class("z-[1000]")
@@ -89,6 +93,8 @@ pub fn contextmenu(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("rounded")
         .class("shadow-md")
         .class("border-transparent")
+        .style("left", &format!("{}px", x)) // X position
+        .style("top", &format!("{}px", y)) // Y position
 }
 
 pub fn contextmenu_option(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {

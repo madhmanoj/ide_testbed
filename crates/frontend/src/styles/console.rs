@@ -6,23 +6,23 @@ pub fn container(
     dom: DomBuilder<HtmlElement>,
     height: &Mutable<u32>
 ) -> DomBuilder<HtmlElement> {
-    dom.style_signal("height", height.signal()
-        .map(|height| format!("{height}px")))
+    dom.class("h-full")
+        .class("bg-lightgray")
+        .style_signal("height", height.signal()
+            .map(|height| format!("{height}px")))
 }
 
 pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("h-full")
-        .class("bg-lightgray")
-}
-
-pub fn title_container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("block")
-        .class("p-3")
+    dom.class("grid")
+        .class("grid-rows-[auto_1fr]")
         .class("m-0")
+        .class("h-full")
 }
 
 pub fn title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("icon-text")
+        .class("p-3")
+        .class("m-0")
 }
 
 pub fn title_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
@@ -35,12 +35,7 @@ pub fn message_area(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("p-2")
         .class("block")
         .style("overflow-y", "scroll")
-        .style("height", "calc(100% - 40px)") // 40 px for the block above
         .class("bg-white")
-}
-
-pub fn entry(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("p-1")
 }
 
 pub fn message(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {

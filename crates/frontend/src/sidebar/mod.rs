@@ -85,10 +85,7 @@ impl Sidebar {
             .apply(styles::sidebar)
 
             // menu
-            .child(html!("div", {
-                .apply(styles::menu::container)    
-                .child(Self::render_menu(this))
-            }))
+            .child(Self::render_menu(this))
             
             // panel
             .child_signal(this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {

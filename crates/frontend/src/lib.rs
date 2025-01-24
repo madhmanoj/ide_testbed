@@ -1,7 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
 use dominator::html;
-use crate::styles::container;
 use futures::channel::mpsc;
 use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
 use once_cell::sync::Lazy;
@@ -50,13 +49,9 @@ pub async fn main() {
     });
 
     let outer = html!("div", {
-        .apply(container)
-        .child(html!("div", {
-            .child(Sidebar::render(&sidebar, &workspace_command_tx))
-        }))
-        .child(html!("div", {
-            .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
-        }))
+        .apply(styles::container)
+        .child(Sidebar::render(&sidebar, &workspace_command_tx))
+        .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
     });
 
     dominator::append_dom(&dominator::body(), outer);

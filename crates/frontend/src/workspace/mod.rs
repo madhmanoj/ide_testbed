@@ -49,11 +49,7 @@ impl Workspace {
             .apply(styles::workspace)
 
             // activity area
-            .child(html!("div", {
-                // .style_signal("height", activity_panel_height
-                //     .map(|height| format!("{height}px")))
-                .child(ActivityPanel::render(&this.activity_panel, workspace_command_rx, width, activity_panel_height))
-            }))
+            .child(ActivityPanel::render(&this.activity_panel, workspace_command_rx, width, activity_panel_height))
 
             // resizer
             .child(html!("div", {
