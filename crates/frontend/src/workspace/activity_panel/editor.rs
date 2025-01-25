@@ -2,7 +2,6 @@ use std::rc::Rc;
 
 use codemirror_sys::{autocomplete, commands, lang_python, language, search, state, view};
 use dominator::{clone, html, stylesheet, svg, Dom};
-use dominator_bulma::block;
 use futures_signals::signal::{self, Signal, SignalExt};
 use wasm_bindgen::prelude::*;
 
@@ -96,7 +95,9 @@ impl Editor {
             "state" => state,
         });
 
-        signal::always(Some(block!({
+        signal::always(Some(html!("div", {
+            .class("block")
+            .class("h-full")
             .after_inserted(move |parent| {
                 parent.append_child(&view.dom()).unwrap();
             })

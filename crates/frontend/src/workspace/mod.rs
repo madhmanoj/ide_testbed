@@ -1,14 +1,15 @@
 use std::rc::Rc;
 
-use dominator::{clone, events, Dom, EventOptions};
-use dominator_bulma::{column, columns};
-use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}};
+use dominator::{clone, events, Dom, EventOptions, html};
+use futures_signals::{map_ref, signal::{Mutable, Signal}};
+
+use crate::styles;
 
 pub mod console;
 pub mod activity_panel;
 
 const DEFAULT_CONSOLE_HEIGHT: u32 = 200;
-const RESIZER_HEIGHT: u32 = 4;
+const RESIZER_PX: u32 = 3;
 
 pub struct Workspace {
     activity_panel: Rc<activity_panel::ActivityPanel>,
@@ -42,25 +43,20 @@ impl Workspace {
 
         let console_height = this.console_height.signal();
         let activity_panel_height = 
-            map_ref!(height, console_height => height.saturating_sub(console_height + RESIZER_HEIGHT));
+            map_ref!(height, console_height => height.saturating_sub(console_height + RESIZER_PX));
 
-        columns!("is-gapless", "is-mobile", "is-multiline", {
+        html!("div", {
+            .apply(styles::default_layout)
+            .class("grid-rows-[1fr_auto_auto]")
+
             // activity area
-            .child(column!("is-full", {
-                // .style_signal("height", activity_panel_height
-                //     .map(|height| format!("{height}px")))
-                .child(ActivityPanel::render(&this.activity_panel, workspace_command_rx, width, activity_panel_height))
-            }))
+            .child(ActivityPanel::render(&this.activity_panel, workspace_command_rx, width, activity_panel_height))
 
             // resizer
-            .child(column!("is-full", {
-                .style("cursor", "ns-resize")
-                .style("height", &format!("{RESIZER_HEIGHT}px"))
-                .class_signal("has-background-white-ter",
-                    signal::not(signal::or(this.resize_active.signal(), this.resizer_hover.signal())))
-                .class_signal("has-background-info",
-                    signal::or(this.resize_active.signal(), this.resizer_hover.signal()))
-                
+            .child(html!("div", {
+                .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
+                .class("cursor-ns-resize")
+                .style("height", &format!("{RESIZER_PX}px"))
                 .event_with_options(&EventOptions::preventable(),
                     clone!(this => move |ev: events::PointerDown| {
                     this.resize_active.set_neq(true);
@@ -92,7 +88,7 @@ impl Workspace {
                             .map(|window_size| window_size.max(0.0))
                             .unwrap() as u32;
                         let console_height = available_height
-                            .saturating_sub(event.y().max(0) as u32 + RESIZER_HEIGHT);
+                            .saturating_sub(event.y().max(0) as u32 + RESIZER_PX);
                         match console_height {
                             0..=75 => {
                                 this.console_height.set(0);
@@ -107,9 +103,8 @@ impl Workspace {
             }))
             
             // terminal
-            .child(column!("is-full", {
-                .style_signal("height", this.console_height.signal()
-                    .map(|height| format!("{height}px")))
+            .child(html!("div", {
+                .apply(|dom| styles::console::container(dom, this.console_height.signal()))
                 .child(this.console.render())
             }))
         })

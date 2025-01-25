@@ -33,6 +33,8 @@ def build():
         os.symlink('../package-lock.json', build_path + '/package-lock.json')
     if not os.path.islink(build_path + '/rspack.config.js'):
         os.symlink('../rspack.config.js', build_path + '/rspack.config.js')
+    if not os.path.islink(build_path + '/tailwind.config.js'):
+        os.symlink('../tailwind.config.js', build_path + '/tailwind.config.js')
     ### Run npm install
     print('Fetching node packages')
     npm_args = ['npm', 'install']
@@ -89,18 +91,30 @@ def build():
     if rspack_proc.returncode != 0:
         raise RuntimeError('rspack terminated with {}'.format(rspack_proc.returncode))
     ### Run Node-Sass
-    print('Generating styles')
-    node_sass_args = [
+    # print('Generating styles')
+    # node_sass_args = [
+    #     'npx',
+    #     'node-sass',
+    #     '--omit-source-map-url',
+    #     project_path + '/styles.scss',
+    #     dist_path + '/styles.css'
+    # ]
+    # node_sass_proc = subprocess.Popen(node_sass_args, cwd=build_path)
+    # node_sass_proc.wait()
+    # if node_sass_proc.returncode != 0:
+    #     raise RuntimeError('node-sass terminated with {}'.format(node_sass_proc.returncode))
+    # Generating css using tailwind
+    print('Generating styles with Tailwind CSS')
+    tailwind_args = [
         'npx',
-        'node-sass',
-        '--omit-source-map-url',
-        project_path + '/styles.scss',
-        dist_path + '/styles.css'
+        'tailwindcss',
+        '-i', project_path + '/styles.css',  # Input CSS with Tailwind directives
+        '-o', dist_path + '/styles.css'        # Output compiled CSS
     ]
-    node_sass_proc = subprocess.Popen(node_sass_args, cwd=build_path)
-    node_sass_proc.wait()
-    if node_sass_proc.returncode != 0:
-        raise RuntimeError('node-sass terminated with {}'.format(node_sass_proc.returncode))
+    tailwind_proc = subprocess.Popen(tailwind_args, cwd=build_path)
+    tailwind_proc.wait()
+    if tailwind_proc.returncode != 0:
+        raise RuntimeError('Tailwind CSS build terminated with {}'.format(tailwind_proc.returncode))
     ### Copy static assets
     print('Copying static assets')
     shutil.copytree(static_path, dist_path, dirs_exist_ok=True)
@@ -136,21 +150,17 @@ def serve() -> Tuple[socketserver.TCPServer, int]:
             self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
             self.send_header("Cross-Origin-Opener-Policy", "same-origin")
             http.server.SimpleHTTPRequestHandler.end_headers(self)
-    ### Find an available port to serve on
     current_port = 3000
-    while current_port < 3016:
-        try:
-            server = socketserver.TCPServer(('localhost', current_port), RequestHandler)
-        except OSError:
-            current_port += 1
-        else:
-            thread = threading.Thread(target=server.serve_forever)
-            thread.start()
-            return server, current_port
-    raise OSError(errno.EADDRINUSE, os.strerror(errno.EADDRINUSE))
+    server = socketserver.TCPServer(('0.0.0.0', current_port), RequestHandler, False)
+    server.allow_reuse_address = True
+    server.server_bind()
+    server.server_activate()
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    return server, current_port
 
 
-server = None
+server, port = serve()
 driver = None
 try:
     options = selenium.webdriver.ChromeOptions()
@@ -166,11 +176,7 @@ except Exception as e:
 try:
     while True:
         try:
-            if server:
-                server.shutdown()
-                server = None
             build()
-            server, port = serve()
             time.sleep(0.5)
             if driver:
                 try:
@@ -179,7 +185,7 @@ try:
                     try:
                         options = selenium.webdriver.ChromeOptions()
                         driver = selenium.webdriver.Remote(
-                            command_executor='http://127.0.0.1:4444/wd/hub',
+                            command_executor='http://host.docker.internal:4444/wd/hub',
                             options=options,
                             desired_capabilities=dict())
                         driver.get('http://localhost:{}/index.html'.format(port))

@@ -6,7 +6,7 @@ use futures_signals::{signal::Mutable, signal_vec::MutableVec};
 pub struct File {
     pub name: Mutable<String>,
     pub mode: Mutable<u32>,
-    pub data: Mutable<Vec<u8>>,
+    pub data: Mutable<Vec<u8>>
 }
 
 #[derive(Clone)]

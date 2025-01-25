@@ -1,6 +1,6 @@
 use std::{rc::Rc, sync::Arc};
 
-use dominator_bulma::{column, columns};
+use dominator::html;
 use futures::channel::mpsc;
 use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
 use once_cell::sync::Lazy;
@@ -11,6 +11,7 @@ mod sidebar;
 mod workspace;
 mod vfs;
 mod contextmenu;
+mod styles;
 
 enum WorkspaceCommand {
     OpenFile(Rc<vfs::File>),
@@ -47,13 +48,11 @@ pub async fn main() {
         window_width.saturating_sub(*sidebar_width)
     });
 
-    let outer = columns!("is-gapless", "is-mobile", {
-        .child(column!("is-narrow", {
-            .child(Sidebar::render(&sidebar, &workspace_command_tx))
-        }))
-        .child(column!({
-            .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
-        }))
+    let outer = html!("div", {
+        .apply(styles::default_layout)
+        .class("grid-cols-[auto_1fr]")
+        .child(Sidebar::render(&sidebar, &workspace_command_tx))
+        .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
     });
 
     dominator::append_dom(&dominator::body(), outer);
@@ -130,9 +129,9 @@ thread_local! {
                             mode: DEFAULT_FILE_MODE.into(),
                             data: VELOCITY_CONTROL_PY.as_bytes().to_vec().into()
                         }.into(),
-                    ].into()
+                    ].into(),
                 }.into()
-            ].into(),
+            ].into()
         }.into()
     });
 }
