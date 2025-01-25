@@ -9,7 +9,8 @@
 	   }
    },
    "remoteUser": "developer",
+   "appPort": [3000],
    "runArgs": [
-      "--network=host"
+      "--add-host=host.docker.internal:host-gateway"
    ]
 }

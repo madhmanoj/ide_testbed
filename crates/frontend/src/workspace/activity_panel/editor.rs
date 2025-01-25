@@ -4,7 +4,6 @@ use codemirror_sys::{autocomplete, commands, lang_python, language, search, stat
 use dominator::{clone, html, stylesheet, svg, Dom};
 use futures_signals::signal::{self, Signal, SignalExt};
 use wasm_bindgen::prelude::*;
-use crate::styles;
 
 // remove this
 macro_rules! object(
@@ -97,7 +96,8 @@ impl Editor {
         });
 
         signal::always(Some(html!("div", {
-            .apply(styles::activity::editor)
+            .class("block")
+            .class("h-full")
             .after_inserted(move |parent| {
                 parent.append_child(&view.dom()).unwrap();
             })

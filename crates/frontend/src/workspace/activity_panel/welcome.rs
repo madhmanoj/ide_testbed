@@ -24,11 +24,19 @@ impl Welcome {
             .broadcast();
       
         let dom = html!("div", {
-            .apply(|dom| styles::activity::welcome_container(dom, height))
+            .class("gap-0")
+            .class("place-items-center")
+            .style("overflow-y", "scroll")
+            .style_signal("height", height.map(|height| format!("{height}px")))
             .child(html!("div", {
-                .apply(|dom| styles::activity::welcome_page(dom, content_max_width))
+                .class("block")
+                .class("h-full")
+                .class("py-6")
+                .class("place-content-center")
+                .style_signal("max-width", content_max_width.signal_ref(|width| format!("{width}px")))
                 .child(html!("h1", {
-                    .class("content")
+                    .class("mb-[0.5em]")
+                    .class("text-[2em]")
                     .text("Web-based IDE")
                 })) 
             }))
@@ -54,7 +62,7 @@ impl Welcome {
             10C19.1 10 20 10.9 20 12S19.1 14 18 14 16 13.1 16 12 16.9 10 18 10M18 \
             4C19.1 4 20 4.9 20 6S19.1 8 18 8 16 7.1 16 6 16.9 4 18 4Z";
         svg!("svg", {
-            .apply(styles::activity::welcome_icon)
+            .apply(styles::welcome_icon)
             .attr("viewBox", "0 0 27 27")
             .child(svg!("path", {
                 .attr("d", PATH)

@@ -29,11 +29,11 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-                .apply(|dom| styles::contextmenu(dom, &context_menu.position.0, &context_menu.position.1))
+                .apply(|dom| styles::contextmenu::body(dom, &context_menu.position.0, &context_menu.position.1))
                 .children(&mut [
                     html!("div", {
                         .text("New Folder")
-                        .apply(styles::contextmenu_option)
+                        .apply(styles::contextmenu::option)
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"New Folder Created".into());
                             context_menu.add_folder();
@@ -41,7 +41,7 @@ impl ContextMenu {
                     }), 
                     html!("div", {
                         .text("New File")
-                        .apply(styles::contextmenu_option)
+                        .apply(styles::contextmenu::option)
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"New File Created".into());
                             context_menu.add_file();
@@ -49,7 +49,7 @@ impl ContextMenu {
                     }),
                     html!("div", {
                         .text("Rename Folder")
-                        .apply(styles::contextmenu_option)
+                        .apply(styles::contextmenu::option)
                         .event(clone!(context_menu => move |_event: events::MouseDown| {
                             web_sys::console::log_1(&"Renaming Folder".into());
                             if let Target::Directory(dir) = &context_menu.target  {
@@ -67,11 +67,11 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .apply(|dom| styles::contextmenu(dom, &context_menu.position.0, &context_menu.position.1))
+            .apply(|dom| styles::contextmenu::body(dom, &context_menu.position.0, &context_menu.position.1))
             .children(&mut [
                 html!("div", {
                     .text("Rename File")
-                    .apply(styles::contextmenu_option)
+                    .apply(styles::contextmenu::option)
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
                         web_sys::console::log_1(&"Renaming File".into());
                         if let Target::File(file) = &context_menu.target  {

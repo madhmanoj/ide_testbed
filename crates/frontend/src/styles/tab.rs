@@ -1,54 +1,47 @@
-use std::rc::Rc;
-
 use dominator::DomBuilder;
-use futures_signals::signal::{self, Mutable, MutableSignalRef};
+use futures_signals::signal::{self, Signal, SignalExt};
 use web_sys::HtmlElement;
-
-use crate::workspace::activity_panel::Activity;
 
 pub fn bar(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("inline-flex")
         .class("h-[35px]")
         .class("gap-0")
         .class("bg-lightgray")
-}
-
-pub fn container(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("h-full")
+        .style("background-color", super::BACKGROUND_COLOR)
 }
 
 pub fn body(dom: DomBuilder<HtmlElement>,
-    is_active: MutableSignalRef<Option<Rc<Activity>>, impl FnMut(&Option<Rc<Activity>>) -> bool + 'static>,
-    mouse_over: &Mutable<bool>
+    is_active: impl Signal<Item = bool> + 'static,
+    mouse_over: impl Signal<Item = bool> + 'static
 ) -> DomBuilder<HtmlElement> {
     dom.class("block")
         .class("h-full")
-        .class("gap-1")
         .class("pt-1.5")
         .class("pl-1")
         .class("pr-2")
+        .class("gap-1")
         .class("cursor-pointer")
-        .class_signal("bg-white",signal::or(
-            is_active,
-            mouse_over.signal())
-        )
-}
-
-pub fn content(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("icon_text")
-        .class("inline-flex")
-}
-
-pub fn icon_default(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("icon")
+        .style_signal("background-color", signal::or(is_active, mouse_over).map(|active| {
+            if active {
+                super::FOREGROUND_COLOR
+            } else {
+                "transparent"
+            }
+        }))
 }
 
 pub fn icon(
     dom: DomBuilder<HtmlElement>,
-    mouse_over_close: &Mutable<bool>,
-    mouse_over: &Mutable<bool>
+    mouse_over_close: impl Signal<Item = bool> + 'static,
+    mouse_over: impl Signal<Item = bool> + 'static
 ) -> DomBuilder<HtmlElement> {
-    dom.class("icon")
-        .class_signal("bg-lightgray", mouse_over_close.signal())
-        .class_signal("invisible", signal::not(mouse_over.signal()))
+    dom.apply(super::icon)
+        .class_signal("invisible", signal::not(mouse_over))
+        .style_signal("background-color", mouse_over_close.map(|flag| {
+            if flag {
+                super::BACKGROUND_COLOR
+            } else {
+                "transparent"
+            }
+        }))
 }

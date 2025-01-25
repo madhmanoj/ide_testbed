@@ -9,7 +9,7 @@ pub mod search;
 
 const DEFAULT_PANEL_SIZE: u32 = 200;
 const MENU_SIZE_PX: u32 = 48;
-const RESIZER_PX: u32 = 2;
+const RESIZER_PX: u32 = 3;
 
 enum Panel {
     // Not sure if this Rc is necessary?
@@ -82,7 +82,8 @@ impl Sidebar {
 
     pub fn render(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> Dom {
         html!("div", {
-            .apply(styles::sidebar)
+            .apply(styles::default_layout)
+            .class("grid-cols-[auto_auto_auto]")
 
             // menu
             .child(Self::render_menu(this))
@@ -90,7 +91,8 @@ impl Sidebar {
             // panel
             .child_signal(this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
                 panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
-                    .apply(|dom| styles::panel::container(dom, &this.panel_size))
+                    .class_signal("hidden", this.panel_size.signal().eq(0))
+                    .style_signal("width", this.panel_size.signal_ref(|s| format!("{s}px")))
                     .child(panel.render(&workspace_command_tx))
                 })))
             })))
@@ -98,7 +100,10 @@ impl Sidebar {
             // resizer
             .child_signal(this.active_panel.signal_cloned().map(clone!(this => move |panel| {
                 panel.map(clone!(this => move |_| html!("div", {
-                    .apply(|dom| styles::vertical_resizer(dom, &this.resize_active, &this.resizer_hover))
+                    .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
+                    .class("min-h-screen")
+                    .class("cursor-ew-resize")
+                    .style("width", &format!("{RESIZER_PX}px"))
                     .event_with_options(&EventOptions::preventable(),
                         clone!(this => move |ev: events::PointerDown| {
                         this.resize_active.set_neq(true);

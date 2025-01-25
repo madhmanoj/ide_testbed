@@ -14,9 +14,13 @@ pub struct Console {}
 impl Console {
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
-            .apply(styles::console::body)
+            .apply(styles::default_layout)
+            .class("grid-rows-[auto_1fr]")
+            .class("m-0")
             .child(html!("div", {
-                .apply(styles::console::title)
+                .apply(styles::icon_text)
+                .class("p-3")
+                .class("m-0")
                 .child(html!("span", {
                     .apply(styles::console::title_text)
                     .text("Log messages")
@@ -56,14 +60,14 @@ fn render_entry(message: Arc<str>) -> Dom {
 
 fn render_message(node: &str) -> Dom {
     html!("div", {
-        .apply(styles::console::message)
+        .apply(styles::console::render_object)
         .text(&node)
     })
 }
 
 fn render_node(node: &str) -> Dom {
     html!("div", {
-        .apply(styles::console::node)
+        .apply(styles::console::render_object)
         .text(&node)
     })
 }
@@ -74,13 +78,13 @@ fn render_timestamp(timestamp: &str) -> Dom {
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
         html!("div", {
-            .apply(styles::console::timestamp)
+            .apply(styles::console::render_object)
             .text(&datetime)
         })
     }
     else {
         html!("div", {
-            .apply(styles::console::timestamp)
+            .apply(styles::console::render_object)
             .text(&timestamp)
         })
     }
@@ -89,11 +93,14 @@ fn render_timestamp(timestamp: &str) -> Dom {
 fn render_category(category: &str) -> Dom {
     html!("div", {
         .apply(|builder| match category {
-            "INFO" => builder.text("info").apply(styles::console::success),
-            "WARN" => builder.text("warn").apply(styles::console::warning),
-            "ERROR" => builder.text("error").apply(styles::console::error),
+            "INFO" => builder.text("info").class("bg-[#48c774]"), // green
+            "WARN" => builder.text("warn").class("bg-[#ffdd57]"), // yellow
+            "ERROR" => builder.text("error").class("bg-[#ff3860]"), // red
             _ => builder.text("unknown")
         })
-        .apply(styles::console::category)
+        .apply(styles::console::render_object)
+        .class("uppercase")
+        .style("min-width", "65px")
+        .style("letter-spacing", ".1em")
     })
 }

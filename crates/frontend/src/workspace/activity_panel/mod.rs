@@ -61,7 +61,7 @@ impl Activity {
         }));
 
         html!("div", {
-            .apply(|dom| styles::tab::body(dom, is_active, &mouse_over))
+            .apply(|dom| styles::tab::body(dom, is_active, mouse_over.signal()))
             .event(clone!(mouse_over => move |_: events::PointerOver| {
                 mouse_over.set_neq(true);
             }))
@@ -72,16 +72,17 @@ impl Activity {
                 panel.active_activity.set(Some(this.clone()))
             }))
             .child(html!("div", {
-                .apply(styles::tab::content)
+                .apply(styles::icon_text)
+                .class("inline-flex")
                 .child(html!("div", {
-                    .apply(styles::tab::icon_default)
+                    .apply(styles::icon)
                     .child(this.icon())
                 }))
                 .child(this.label())
                 // HACK DO NOT SHOW THE CLOSE ICON 
                 .apply_if(matches!(**this, Activity::Editor(_)), |dom| {
                     dom.child(html!("div", {
-                        .apply(|dom| styles::tab::icon(dom, &mouse_over_close, &mouse_over))
+                        .apply(|dom| styles::tab::icon(dom, mouse_over_close.signal(), mouse_over.signal()))
                         .event(clone!(mouse_over_close => move |_: events::PointerOver| {
                             mouse_over_close.set_neq(true);
                         }))
@@ -144,7 +145,9 @@ impl ActivityPanel {
         let height = height.broadcast();
 
         html!("div", {
-            .apply(styles::activity::area)
+            .apply(styles::default_layout)
+            .class("grid-rows-[auto_1fr]")
+
             .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
                 match command {
                     crate::WorkspaceCommand::OpenFile(file) => {
@@ -174,7 +177,7 @@ impl ActivityPanel {
                 .apply(styles::tab::bar)
                 .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
                     html!("div", {
-                        .apply(styles::tab::container)
+                        .class("h-full")
                         .child(Activity::render_tab(&activity, &this))
                     })
                 })))
@@ -183,7 +186,7 @@ impl ActivityPanel {
                 .signal_cloned()
                 .map(move |activity: Option<Rc<Activity>>| activity
                     .map(clone!(width, height => move |activity| html!("div", {
-                        .apply(styles::activity::container)
+                        .class("h-full")
                         .child_signal(Activity::render(
                             &activity,
                             width.signal(),
@@ -198,7 +201,11 @@ impl ActivityPanel {
         height: impl Signal<Item = u32> + 'static
     ) -> Dom {
         html!("div", {
-            .apply(|dom| styles::activity::background(dom, height))
+            .style_signal("height", height.map(|height| format!("{height}px")))
+            .style("background-image", "url('images/background.png')")
+            .style("background-repeat", "no-repeat")
+            .style("background-position", "center")
+            .style("background-size", "auto 40%")
         })
     }
 }

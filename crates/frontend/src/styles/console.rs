@@ -1,28 +1,28 @@
 use dominator::DomBuilder;
-use futures_signals::signal::{Mutable, SignalExt};
+use futures_signals::signal::{Signal, SignalExt};
 use web_sys::HtmlElement;
+
+pub fn tag(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("inline-flex")
+        .class("h-[2em]")
+        .class("pr-[0.75em]")
+        .class("pl-[0.75em]")
+        .class("rounded-md")
+        .class("text-xs")
+        .class("leading-[1.5]")
+        .class("justify-center")
+        .class("items-center")
+        .class("whitespace-nowrap")
+}
 
 pub fn container(
     dom: DomBuilder<HtmlElement>,
-    height: &Mutable<u32>
+    height: impl Signal<Item = u32> + 'static
 ) -> DomBuilder<HtmlElement> {
     dom.class("h-full")
-        .class("bg-lightgray")
-        .style_signal("height", height.signal()
+        .style("background-color", super::BACKGROUND_COLOR)
+        .style_signal("height", height
             .map(|height| format!("{height}px")))
-}
-
-pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("grid")
-        .class("grid-rows-[auto_1fr]")
-        .class("m-0")
-        .class("h-full")
-}
-
-pub fn title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("icon-text")
-        .class("p-3")
-        .class("m-0")
 }
 
 pub fn title_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
@@ -32,47 +32,14 @@ pub fn title_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
 }
 
 pub fn message_area(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("p-2")
-        .class("block")
+    dom.class("block")
+        .class("p-2")
+        .style("background-color", super::FOREGROUND_COLOR)
         .style("overflow-y", "scroll")
-        .class("bg-white")
 }
 
-pub fn message(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("tag")
-        .class("bg-white")
-        .class("text-[#090a0c]")
-}
-
-pub fn node(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("tag")
-        .class("bg-white")
-        .class("text-[#090a0c]")
-}
-
-pub fn timestamp(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("tag")
-        .class("bg-white")
-        .class("text-[#090a0c]")
-}
-
-pub fn category(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("tag")
-        .class("bg-[#f3f4f6]")
-        .class("text-[#2e333d]")
-        .class("uppercase")
-        .style("min-width", "65px")
-        .style("letter-spacing", ".1em")
-}
-
-pub fn warning(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("bg-[#ffdd57]")
-}
-
-pub fn error(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("bg-[#ff3860]")
-}
-
-pub fn success(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("bg-[#48c774]")
+pub fn render_object(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.apply(tag)
+        .style("background-color", super::FOREGROUND_COLOR)
+        .style("color", super::TEXT_COLOR)
 }

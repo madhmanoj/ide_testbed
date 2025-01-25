@@ -150,24 +150,17 @@ def serve() -> Tuple[socketserver.TCPServer, int]:
             self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
             self.send_header("Cross-Origin-Opener-Policy", "same-origin")
             http.server.SimpleHTTPRequestHandler.end_headers(self)
-    ### Find an available port to serve on
     current_port = 3000
-    while current_port < 3016:
-        try:
-            server = socketserver.TCPServer(('0.0.0.0', current_port), RequestHandler, False)
-            server.allow_reuse_address = True
-            server.server_bind()
-            server.server_activate()
-        except OSError:
-            current_port += 1
-        else:
-            thread = threading.Thread(target=server.serve_forever)
-            thread.start()
-            return server, current_port
-    raise OSError(errno.EADDRINUSE, os.strerror(errno.EADDRINUSE))
+    server = socketserver.TCPServer(('0.0.0.0', current_port), RequestHandler, False)
+    server.allow_reuse_address = True
+    server.server_bind()
+    server.server_activate()
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    return server, current_port
 
 
-server = None
+server, port = serve()
 driver = None
 try:
     options = selenium.webdriver.ChromeOptions()
@@ -183,11 +176,7 @@ except Exception as e:
 try:
     while True:
         try:
-            if server:
-                server.shutdown()
-                server = None
             build()
-            server, port = serve()
             time.sleep(0.5)
             if driver:
                 try:
@@ -196,7 +185,7 @@ try:
                     try:
                         options = selenium.webdriver.ChromeOptions()
                         driver = selenium.webdriver.Remote(
-                            command_executor='http://127.0.0.1:4444/wd/hub',
+                            command_executor='http://host.docker.internal:4444/wd/hub',
                             options=options,
                             desired_capabilities=dict())
                         driver.get('http://localhost:{}/index.html'.format(port))

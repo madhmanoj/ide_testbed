@@ -49,7 +49,8 @@ pub async fn main() {
     });
 
     let outer = html!("div", {
-        .apply(styles::container)
+        .apply(styles::default_layout)
+        .class("grid-cols-[auto_1fr]")
         .child(Sidebar::render(&sidebar, &workspace_command_tx))
         .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
     });

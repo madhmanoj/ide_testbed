@@ -3,24 +3,6 @@
 @tailwind utilities;
 
 @layer components {
-    .icon {
-        @apply grid justify-items-center items-center shrink-0 h-6 w-6;
-        transition-property: color;
-        transition-duration: 294ms;
-    }
-
-    .icon-text {
-        @apply grid grid-flow-col auto-cols-max gap-[0.25em] leading-6 text-inherit;
-    }
-
-    .content {
-        @apply text-[2em] mb-[0.5em];
-    }
-
-    .tag {
-        @apply items-center rounded-md inline-flex h-[2em] text-xs justify-center leading-[1.5] pr-[0.75em] pl-[0.75em] whitespace-nowrap;
-    }
-    
     .cm-scroller {
         @apply overflow-auto;
     }

@@ -91,7 +91,7 @@ fn render_contents(
         .map(clone!(workspace_command_tx, context_menu => move |directory| {
             let expanded = Mutable::new(true);
             html!("li", {
-                .apply(styles::vfs_item_list)
+                .apply(styles::vfs_item::list)
                 .attr("draggable", "true")
                 .event(clone!(directory => move |_: events::DragStart| {
                     DRAGGED_ITEM.with(|dragged| {
@@ -124,7 +124,7 @@ fn render_contents(
                     });
                 })
                 .child(html!("div", {
-                    .apply(styles::vfs_item)
+                    .apply(styles::vfs_item::body)
                     .event(clone!(expanded => move |event: events::MouseDown| {
                         // left click to expand directory
                         let rename = RENAME.with(|rename| rename.get_cloned().is_some());
@@ -136,7 +136,7 @@ fn render_contents(
                     }))
                     .children(&mut [
                         html!("div", {
-                            .apply(styles::vfs_item_icon)
+                            .apply(styles::vfs_item::icon)
                             .child_signal(expanded.signal_ref(|expanded| match expanded {
                                 true => folder_open_icon(),
                                 false => folder_closed_icon(),
@@ -148,7 +148,7 @@ fn render_contents(
                                 match global_target {
                                     Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &directory) => {
                                         Some(html!("input" => web_sys::HtmlInputElement, {
-                                            .apply(styles::panel::input)
+                                            .apply(styles::input)
                                             .attr("type", "text")
                                             .attr("value", &*directory.name.get_cloned())
                                             .with_node!(element => {
@@ -193,7 +193,7 @@ fn render_contents(
         .sort_by_cloned(|left_file, right_file|
             left_file.name.lock_ref().cmp(&*right_file.name.lock_ref()))
         .map(clone!(workspace_command_tx => move |file| html!("li", {
-            .apply(styles::vfs_item_list)
+            .apply(styles::vfs_item::list)
             .attr("draggable", "true")
             .event(clone!(file => move |_: events::DragStart| {
                 DRAGGED_ITEM.with(|dragged| {
@@ -209,7 +209,7 @@ fn render_contents(
                 });
             })
             .child(html!("div", {
-                .apply(styles::vfs_item)
+                .apply(styles::vfs_item::body)
                 .event(clone!(workspace_command_tx, file => move |event: events::MouseDown| {
                     // left-click to open file in workspace
                     let rename = RENAME.with(|rename| rename.get_cloned().is_some());
@@ -222,7 +222,7 @@ fn render_contents(
                 }))
                 .children(&mut [
                     html!("div", {
-                        .apply(styles::vfs_item_icon)
+                        .apply(styles::vfs_item::icon)
                         .child(file_icon())
                     }),
                     html!("div", {
@@ -231,7 +231,7 @@ fn render_contents(
                             match target {
                                 Some(Target::File(ref fil)) if Rc::ptr_eq(fil, &file) => {
                                     Some(html!("input" => web_sys::HtmlInputElement, {
-                                        .apply(styles::panel::input)
+                                        .apply(styles::input)
                                         .attr("type", "text")
                                         .attr("value", &*file.name.get_cloned())
                                         .with_node!(element => {
@@ -331,7 +331,7 @@ impl Explorer {
                         });
                     })
                     .child(html!("div", {
-                        .apply(styles::vfs_item)
+                        .apply(styles::vfs_item::body)
                         .event(clone!(expanded => move |event: events::MouseDown| {
                             // left-click to expand directory
                             let rename = RENAME.with(|rename| rename.get_cloned().is_some());
@@ -343,7 +343,7 @@ impl Explorer {
                         }))
                         .children(&mut [
                             html!("div", {
-                                .apply(styles::vfs_item_icon)
+                                .apply(styles::vfs_item::icon)
                                 .child_signal(expanded.signal_ref(|expanded| match expanded {
                                     true => folder_open_icon(),
                                     false => folder_closed_icon(),
@@ -355,7 +355,7 @@ impl Explorer {
                                     match target {
                                         Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &this.workspace) => {
                                             Some(html!("input" => web_sys::HtmlInputElement, {
-                                                .apply(styles::panel::input)
+                                                .apply(styles::input)
                                                 .attr("type", "text")
                                                 .attr("value", &*this.workspace.name.get_cloned())
                                                 .with_node!(element => {
@@ -419,9 +419,8 @@ impl Explorer {
     }
 
     pub fn icon(&self, active: impl Signal<Item = bool> + 'static) -> Dom {
-        let active = active.broadcast();
         svg!("svg", {
-            .apply(|dom| styles::menu::button_explorer(dom, &active))
+            .apply(|dom| styles::menu::button_toggle(dom, active))
             .attr("viewBox", "0 0 27 27")
             .child(svg!("path", {
                 .attr("d", ICON_SVG_PATH)

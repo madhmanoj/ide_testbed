@@ -1,5 +1,5 @@
 use dominator::{html, svg, Dom};
-use futures_signals::signal::{Signal, SignalExt};
+use futures_signals::signal::Signal;
 
 use crate::styles;
 
@@ -20,9 +20,8 @@ impl Search {
     }
 
     pub fn icon(&self, active: impl Signal<Item = bool> + 'static) -> Dom {
-        let active = active.broadcast();
         svg!("svg", {
-            .apply(|dom| styles::menu::button_search(dom, &active)) 
+            .apply(|dom| styles::menu::button_toggle(dom, active)) 
             .attr("viewBox", "0 0 24 24")
             .child(svg!("path", {
                 .attr("d", ICON_SVG_PATH)
