@@ -21,6 +21,16 @@ pub fn default_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("gap-0")
 }
 
+pub fn sidebar_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("col-span-1")
+        .class("row-span-3")
+}
+
+pub fn workspace_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("col-span-1")
+        .class("row-span-1")
+}
+
 pub fn resizer(
     dom: DomBuilder<HtmlElement>,
     active: impl Signal<Item = bool> + 'static,

@@ -13,6 +13,8 @@ mod vfs;
 mod contextmenu;
 mod styles;
 
+const RESIZER_PX: u32 = 3;
+
 enum WorkspaceCommand {
     OpenFile(Rc<vfs::File>),
 }
@@ -31,7 +33,7 @@ pub async fn main() {
         .init();
 
     use sidebar::Sidebar;
-    use workspace::Workspace;
+    use workspace::{Workspace, activity_panel::ActivityPanel};
 
     let (workspace_command_tx, workspace_command_rx) = mpsc::unbounded();
 
@@ -48,11 +50,30 @@ pub async fn main() {
         window_width.saturating_sub(*sidebar_width)
     });
 
+    let console_height = workspace.console_height.signal();
+    let activity_panel_height = 
+        map_ref!(window_height, console_height => window_height.saturating_sub(console_height + RESIZER_PX));
+
     let outer = html!("div", {
+        // .apply(styles::default_layout)
+        // .class("grid-cols-[auto_1fr]")
+        // .child(Sidebar::render(&sidebar, &workspace_command_tx))
+        // .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
         .apply(styles::default_layout)
-        .class("grid-cols-[auto_1fr]")
-        .child(Sidebar::render(&sidebar, &workspace_command_tx))
-        .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
+        .class("grid-cols-[auto_auto_auto_1fr]")
+        .class("grid-rows-[1fr_auto_auto]")
+
+        .child(Sidebar::render_menu(&sidebar))
+
+        .child_signal(Sidebar::render_panel(&sidebar, &workspace_command_tx))
+
+        .child_signal(Sidebar::render_vert_resizer(&sidebar))
+
+        .child(ActivityPanel::render(&workspace.activity_panel, workspace_command_rx, workspace_width, activity_panel_height))
+
+        .child(Workspace::render_horizontal_resizer(&workspace))
+
+        .child(Workspace::render_console(&workspace))
     });
 
     dominator::append_dom(&dominator::body(), outer);

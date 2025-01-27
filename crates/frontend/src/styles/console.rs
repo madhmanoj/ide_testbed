@@ -19,8 +19,7 @@ pub fn container(
     dom: DomBuilder<HtmlElement>,
     height: impl Signal<Item = u32> + 'static
 ) -> DomBuilder<HtmlElement> {
-    dom.class("h-full")
-        .style("background-color", super::BACKGROUND_COLOR)
+    dom.style("background-color", super::BACKGROUND_COLOR)
         .style_signal("height", height
             .map(|height| format!("{height}px")))
 }

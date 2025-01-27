@@ -11,7 +11,7 @@ const DEFAULT_PANEL_SIZE: u32 = 200;
 const MENU_SIZE_PX: u32 = 48;
 const RESIZER_PX: u32 = 3;
 
-enum Panel {
+pub enum Panel {
     // Not sure if this Rc is necessary?
     Explorer(Rc<explorer::Explorer>),
     Search(search::Search)
@@ -32,7 +32,7 @@ impl Panel {
         }
     }
 
-    fn render(&self, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
+    pub fn render(&self, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
         match self {
             Panel::Explorer(explorer) => explorer::Explorer::render(explorer, workspace_command_tx),
             Panel::Search(search) => search.render(),
@@ -41,11 +41,11 @@ impl Panel {
 }
 
 pub struct Sidebar {
-    panels: Vec<Rc<Panel>>,
-    active_panel: Mutable<Option<Rc<Panel>>>,
-    panel_size: Mutable<u32>,
-    resize_active: Mutable<bool>,
-    resizer_hover: Mutable<bool>
+    pub panels: Vec<Rc<Panel>>,
+    pub active_panel: Mutable<Option<Rc<Panel>>>,
+    pub panel_size: Mutable<u32>,
+    pub resize_active: Mutable<bool>,
+    pub resizer_hover: Mutable<bool>
 }
 
 impl Default for Sidebar {
@@ -80,76 +80,7 @@ impl Sidebar {
         }
     }
 
-    pub fn render(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> Dom {
-        html!("div", {
-            .apply(styles::default_layout)
-            .class("grid-cols-[auto_auto_auto]")
-
-            // menu
-            .child(Self::render_menu(this))
-            
-            // panel
-            .child_signal(this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
-                panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
-                    .class_signal("hidden", this.panel_size.signal().eq(0))
-                    .style_signal("width", this.panel_size.signal_ref(|s| format!("{s}px")))
-                    .child(panel.render(&workspace_command_tx))
-                })))
-            })))
-            
-            // resizer
-            .child_signal(this.active_panel.signal_cloned().map(clone!(this => move |panel| {
-                panel.map(clone!(this => move |_| html!("div", {
-                    .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
-                    .class("min-h-screen")
-                    .class("cursor-ew-resize")
-                    .style("width", &format!("{RESIZER_PX}px"))
-                    .event_with_options(&EventOptions::preventable(),
-                        clone!(this => move |ev: events::PointerDown| {
-                        this.resize_active.set_neq(true);
-                        ev.prevent_default();
-                    }))
-                    .global_event(clone!(this => move |_: events::PointerUp| {
-                        this.resize_active.set_neq(false);
-                        if this.panel_size.get() == 0 {
-                            this.active_panel.set(None);
-                            this.panel_size.set(DEFAULT_PANEL_SIZE)
-                        }
-                    }))
-                    .event(clone!(this => move |_: events::PointerOver| {
-                        this.resizer_hover.set_neq(true);
-                    }))
-                    .event(clone!(this => move |_: events::PointerOut| {
-                        this.resizer_hover.set_neq(false);
-                    }))
-                    .global_event(clone!(this => move |event: events::PointerMove| {
-                        if this.resize_active.get() {
-                            let max_panel_size_px = web_sys::window()
-                                .unwrap()
-                                .inner_width()
-                                .unwrap()
-                                .as_f64()
-                                .map(|window_size| 0.8 * window_size)
-                                .unwrap() as u32;
-                            let panel_size_px = (event.x().max(0) as u32).saturating_sub(MENU_SIZE_PX)
-                                .min(max_panel_size_px);
-                            match panel_size_px {
-                                0..=150 => {
-                                    this.panel_size.set(0);
-                                }
-                                151..=200 => {}
-                                _ => {
-                                    this.panel_size.set(panel_size_px);
-                                }
-                            }
-                        }
-                    }))
-                })))
-            })))
-        })
-    }
-
-    fn render_menu(this: &Rc<Sidebar>) -> Dom {
+    pub fn render_menu(this: &Rc<Sidebar>) -> Dom {
         let buttons = this.panels.iter()
             .map(clone!(this => move |panel| {
                 let mouse_over = Mutable::new(false);
@@ -186,7 +117,140 @@ impl Sidebar {
 
         html!("div", {
             .apply(styles::menu::body)
+            .apply(styles::sidebar_layout)
             .children(buttons)
         })
     }
+
+    pub fn render_panel(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> impl Signal<Item = Option<Dom>> + 'static {
+        this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
+            panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
+                .apply(styles::sidebar_layout)
+                .class_signal("hidden", this.panel_size.signal().eq(0))
+                .style_signal("width", this.panel_size.signal_ref(|s| format!("{s}px")))
+                .child(panel.render(&workspace_command_tx))
+            })))
+        }))
+    }
+
+    pub fn render_vert_resizer(this: &Rc<Sidebar>) -> impl Signal<Item = Option<Dom>> + 'static {
+        this.active_panel.signal_cloned().map(clone!(this => move |panel| {
+            panel.map(clone!(this => move |_| html!("div", {
+                .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
+                .apply(styles::sidebar_layout)
+                .class("min-h-screen")
+                .class("cursor-ew-resize")
+                .style("width", &format!("{RESIZER_PX}px"))
+                .event_with_options(&EventOptions::preventable(),
+                    clone!(this => move |ev: events::PointerDown| {
+                    this.resize_active.set_neq(true);
+                    ev.prevent_default();
+                }))
+                .global_event(clone!(this => move |_: events::PointerUp| {
+                    this.resize_active.set_neq(false);
+                    if this.panel_size.get() == 0 {
+                        this.active_panel.set(None);
+                        this.panel_size.set(DEFAULT_PANEL_SIZE)
+                    }
+                }))
+                .event(clone!(this => move |_: events::PointerOver| {
+                    this.resizer_hover.set_neq(true);
+                }))
+                .event(clone!(this => move |_: events::PointerOut| {
+                    this.resizer_hover.set_neq(false);
+                }))
+                .global_event(clone!(this => move |event: events::PointerMove| {
+                    if this.resize_active.get() {
+                        let max_panel_size_px = web_sys::window()
+                            .unwrap()
+                            .inner_width()
+                            .unwrap()
+                            .as_f64()
+                            .map(|window_size| 0.8 * window_size)
+                            .unwrap() as u32;
+                        let panel_size_px = (event.x().max(0) as u32).saturating_sub(MENU_SIZE_PX)
+                            .min(max_panel_size_px);
+                        match panel_size_px {
+                            0..=150 => {
+                                this.panel_size.set(0);
+                            }
+                            151..=200 => {}
+                            _ => {
+                                this.panel_size.set(panel_size_px);
+                            }
+                        }
+                    }
+                }))
+            })))
+        }))
+    }
+
+    // pub fn render(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> Dom {
+    //     html!("div", {
+    //         .apply(styles::default_layout)
+    //         .class("grid-cols-[auto_auto_auto]")
+
+    //         // menu
+    //         .child(Self::render_menu(this))
+            
+    //         // panel
+    //         .child_signal(this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
+    //             panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
+    //                 .class_signal("hidden", this.panel_size.signal().eq(0))
+    //                 .style_signal("width", this.panel_size.signal_ref(|s| format!("{s}px")))
+    //                 .child(panel.render(&workspace_command_tx))
+    //             })))
+    //         })))
+            
+    //         // resizer
+    //         .child_signal(this.active_panel.signal_cloned().map(clone!(this => move |panel| {
+    //             panel.map(clone!(this => move |_| html!("div", {
+    //                 .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
+    //                 .class("min-h-screen")
+    //                 .class("cursor-ew-resize")
+    //                 .style("width", &format!("{RESIZER_PX}px"))
+    //                 .event_with_options(&EventOptions::preventable(),
+    //                     clone!(this => move |ev: events::PointerDown| {
+    //                     this.resize_active.set_neq(true);
+    //                     ev.prevent_default();
+    //                 }))
+    //                 .global_event(clone!(this => move |_: events::PointerUp| {
+    //                     this.resize_active.set_neq(false);
+    //                     if this.panel_size.get() == 0 {
+    //                         this.active_panel.set(None);
+    //                         this.panel_size.set(DEFAULT_PANEL_SIZE)
+    //                     }
+    //                 }))
+    //                 .event(clone!(this => move |_: events::PointerOver| {
+    //                     this.resizer_hover.set_neq(true);
+    //                 }))
+    //                 .event(clone!(this => move |_: events::PointerOut| {
+    //                     this.resizer_hover.set_neq(false);
+    //                 }))
+    //                 .global_event(clone!(this => move |event: events::PointerMove| {
+    //                     if this.resize_active.get() {
+    //                         let max_panel_size_px = web_sys::window()
+    //                             .unwrap()
+    //                             .inner_width()
+    //                             .unwrap()
+    //                             .as_f64()
+    //                             .map(|window_size| 0.8 * window_size)
+    //                             .unwrap() as u32;
+    //                         let panel_size_px = (event.x().max(0) as u32).saturating_sub(MENU_SIZE_PX)
+    //                             .min(max_panel_size_px);
+    //                         match panel_size_px {
+    //                             0..=150 => {
+    //                                 this.panel_size.set(0);
+    //                             }
+    //                             151..=200 => {}
+    //                             _ => {
+    //                                 this.panel_size.set(panel_size_px);
+    //                             }
+    //                         }
+    //                     }
+    //                 }))
+    //             })))
+    //         })))
+    //     })
+    // }
 }

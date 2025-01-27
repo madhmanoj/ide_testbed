@@ -146,6 +146,7 @@ impl ActivityPanel {
 
         html!("div", {
             .apply(styles::default_layout)
+            .apply(styles::workspace_layout)
             .class("grid-rows-[auto_1fr]")
 
             .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
