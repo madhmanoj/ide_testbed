@@ -1,10 +1,11 @@
 use std::{pin::Pin, rc::Rc};
 
-use dominator::{clone, events, svg, Dom, EventOptions, html};
+use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions};
 use futures::StreamExt;
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 
 use crate::styles;
+use crate::contextmenu::TabMenu;
 
 pub mod editor;
 pub mod welcome;
@@ -59,6 +60,7 @@ impl Activity {
         let is_active = panel.active_activity.signal_ref(clone!(this => move |active_activity| {
             active_activity.as_ref().is_some_and(|active_activity| Rc::ptr_eq(active_activity, &this))
         }));
+        let tab_menu: Mutable<Option<TabMenu>> = Mutable::new(None);
 
         html!("div", {
             .class("block")
@@ -102,6 +104,29 @@ impl Activity {
                         .child(close_icon)
                     }))
                 })
+            }))
+
+            // rendering tab menu
+            .child_signal(tab_menu.signal_ref(|menu_state| {
+                menu_state.as_ref().map(|menu| {
+                    TabMenu::render(menu)
+                })
+            }))
+            // event handler for tab context menu
+            .event(clone!(tab_menu => move |event: events::ContextMenu| {
+                tab_menu.set(Some(TabMenu::new(
+                    (event.x(), event.y())
+                )));
+            }))
+            // prevents default chrome context menu for the the tab bar
+            .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
+                event.prevent_default();
+            })
+            // global event listener to close tab menu
+            .global_event(clone!(tab_menu => move |event: events::MouseDown| {
+                if event.button() == MouseButton::Left || event.button() == MouseButton::Right {
+                    tab_menu.set(None)
+                }
             }))
         })
         

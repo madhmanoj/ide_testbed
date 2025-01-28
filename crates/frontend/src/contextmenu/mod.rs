@@ -24,7 +24,6 @@ impl ContextMenu {
         }
     }
 
-    // rendering context menu for folder
     pub fn folder_menu_render(
         context_menu: &ContextMenu
     ) -> Dom {
@@ -40,7 +39,6 @@ impl ContextMenu {
                     .text("New Folder")
                     .apply(styles::contextmenu::option)
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
-                        web_sys::console::log_1(&"New Folder Created".into());
                         context_menu.add_folder();
                     }))
                 }), 
@@ -48,7 +46,6 @@ impl ContextMenu {
                     .text("New File")
                     .apply(styles::contextmenu::option)
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
-                        web_sys::console::log_1(&"New File Created".into());
                         context_menu.add_file();
                     }))
                 }),
@@ -56,7 +53,6 @@ impl ContextMenu {
                     .text("Rename Folder")
                     .apply(styles::contextmenu::option)
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
-                        web_sys::console::log_1(&"Renaming Folder".into());
                         if let Target::Directory(dir) = &context_menu.target  {
                             RENAME.with(|rename| {
                                 rename.set(Some(Target::Directory(dir.clone())));
@@ -83,7 +79,6 @@ impl ContextMenu {
                     .text("Rename File")
                     .apply(styles::contextmenu::option)
                     .event(clone!(context_menu => move |_event: events::MouseDown| {
-                        web_sys::console::log_1(&"Renaming File".into());
                         if let Target::File(file) = &context_menu.target  {
                             RENAME.with(|rename| {
                                 rename.set(Some(Target::File(file.clone())));
@@ -140,5 +135,37 @@ impl ContextMenu {
                 rename.set(Some(Target::File(new_file.clone())));
             });
         }
+    }
+}
+
+pub struct TabMenu {
+    // position of the tab context menu
+    pub position: (i32, i32),
+}
+
+impl TabMenu {
+    pub fn new(position: (i32, i32)) -> Self {
+        Self {
+            position
+        }
+    }
+
+    pub fn render(
+        tab_menu: &TabMenu
+    ) -> Dom {
+        html!("div", {
+            .class("absolute")
+            .class("z-[1000]")
+            .class("w-60")
+            .style("left", &format!("{}px", tab_menu.position.0)) // X position
+            .style("top", &format!("{}px", tab_menu.position.1))  // Y position
+            .apply(styles::contextmenu::body)
+            .children(&mut [
+                html!("div", {
+                    .text("Split Pane")
+                    .apply(styles::contextmenu::option)
+                })
+            ])
+        })
     }
 }

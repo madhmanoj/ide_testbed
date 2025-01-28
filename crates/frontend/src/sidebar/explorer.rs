@@ -405,8 +405,10 @@ impl Explorer {
                         event.prevent_default();
                     })
                     // global event listener to close context menu
-                    .global_event(clone!(this => move |_:events::Click| {
-                        this.context_menu.set(None)
+                    .global_event(clone!(this => move |event: events::MouseDown| {
+                        if event.button() == MouseButton::Left || event.button() == MouseButton::Right {
+                            this.context_menu.set(None)
+                        }
                     }))
                     .child_signal(expanded.signal_ref(clone!(this, workspace_command_tx => move |expanded| {
                         expanded.then_some(render_contents(&this.workspace, &workspace_command_tx, this.context_menu.clone()))
