@@ -47,9 +47,9 @@ pub fn resizer(
 
 pub fn input(dom: DomBuilder<HtmlInputElement>) -> DomBuilder<HtmlInputElement> {
     dom.class("w-full")
-        .class("ring-coreblue")
         .class("focus:outline-none")
-        .class("focus:ring-2")
+        .style("border", format!("2px solid {}", FEATURE_COLOR))
+        .style("box-shadow", "none")
 }
 
 pub fn icon(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {

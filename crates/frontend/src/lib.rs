@@ -55,10 +55,6 @@ pub async fn main() {
         map_ref!(window_height, console_height => window_height.saturating_sub(console_height + RESIZER_PX));
 
     let outer = html!("div", {
-        // .apply(styles::default_layout)
-        // .class("grid-cols-[auto_1fr]")
-        // .child(Sidebar::render(&sidebar, &workspace_command_tx))
-        // .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
         .apply(styles::default_layout)
         .class("grid-cols-[auto_auto_auto_1fr]")
         .class("grid-rows-[1fr_auto_auto]")

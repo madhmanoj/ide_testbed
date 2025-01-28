@@ -29,45 +29,55 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-                .apply(|dom| styles::contextmenu::body(dom, &context_menu.position.0, &context_menu.position.1))
-                .children(&mut [
-                    html!("div", {
-                        .text("New Folder")
-                        .apply(styles::contextmenu::option)
-                        .event(clone!(context_menu => move |_event: events::MouseDown| {
-                            web_sys::console::log_1(&"New Folder Created".into());
-                            context_menu.add_folder();
-                        }))
-                    }), 
-                    html!("div", {
-                        .text("New File")
-                        .apply(styles::contextmenu::option)
-                        .event(clone!(context_menu => move |_event: events::MouseDown| {
-                            web_sys::console::log_1(&"New File Created".into());
-                            context_menu.add_file();
-                        }))
-                    }),
-                    html!("div", {
-                        .text("Rename Folder")
-                        .apply(styles::contextmenu::option)
-                        .event(clone!(context_menu => move |_event: events::MouseDown| {
-                            web_sys::console::log_1(&"Renaming Folder".into());
-                            if let Target::Directory(dir) = &context_menu.target  {
-                                RENAME.with(|rename| {
-                                    rename.set(Some(Target::Directory(dir.clone())));
-                                });
-                            }
-                        }))
-                    })
-                ])
-            })
+            .class("absolute")
+            .class("z-[1000]")
+            .class("w-60")
+            .style("left", &format!("{}px", context_menu.position.0)) // X position
+            .style("top", &format!("{}px", context_menu.position.1))  // Y position
+            .apply(styles::contextmenu::body)
+            .children(&mut [
+                html!("div", {
+                    .text("New Folder")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                        web_sys::console::log_1(&"New Folder Created".into());
+                        context_menu.add_folder();
+                    }))
+                }), 
+                html!("div", {
+                    .text("New File")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                        web_sys::console::log_1(&"New File Created".into());
+                        context_menu.add_file();
+                    }))
+                }),
+                html!("div", {
+                    .text("Rename Folder")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                        web_sys::console::log_1(&"Renaming Folder".into());
+                        if let Target::Directory(dir) = &context_menu.target  {
+                            RENAME.with(|rename| {
+                                rename.set(Some(Target::Directory(dir.clone())));
+                            });
+                        }
+                    }))
+                })
+            ])
+        })
     }
     
     pub fn file_menu_render(
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .apply(|dom| styles::contextmenu::body(dom, &context_menu.position.0, &context_menu.position.1))
+            .class("absolute")
+            .class("z-[1000]")
+            .class("w-60")
+            .style("left", &format!("{}px", context_menu.position.0)) // X position
+            .style("top", &format!("{}px", context_menu.position.1))  // Y position
+            .apply(styles::contextmenu::body)
             .children(&mut [
                 html!("div", {
                     .text("Rename File")

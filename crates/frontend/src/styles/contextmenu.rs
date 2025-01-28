@@ -1,30 +1,40 @@
-use dominator::DomBuilder;
+use dominator::{clone, events, DomBuilder};
+use futures_signals::signal::{Mutable, SignalExt};
 use web_sys::HtmlElement;
 
-pub fn body(
-    dom: DomBuilder<HtmlElement>,
-    x: &i32,
-    y: &i32
-) -> DomBuilder<HtmlElement> {
-    dom.class("absolute")
-        .class("z-[1000]")
-        .class("w-60")
-        .class("p-1")
+pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom.class("p-1")
         .class("border-transparent")
         .class("rounded")
-        .class("shadow-md")
-        .style("left", &format!("{}px", x)) // X position
-        .style("top", &format!("{}px", y)) // Y position
+        .class("shadow-md") 
         .style("background-color", super::FOREGROUND_COLOR)
 }
 
 pub fn option(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    let is_hovered = Mutable::new(false);
     dom.class("pl-5")
         .class("pt-0.5")
-        .class("bg-inherit")
-        .class("hover:bg-coreblue")
         .class("hover:rounded")
-        .class("hover:text-white")
         .class("text-[0.9rem]")
         .class("cursor-pointer")
+        .style_signal("background-color", is_hovered.signal().map(|hover| {
+            if hover {
+                super::FEATURE_COLOR
+            } else {
+                super::FOREGROUND_COLOR
+            }
+        }))
+        .style_signal("color", is_hovered.signal().map(|hover| {
+            if hover {
+                super::FOREGROUND_COLOR
+            } else {
+                super::TEXT_COLOR
+            }
+        }))
+        .event(clone!(is_hovered => move |_: events::MouseEnter| {
+            is_hovered.set(true);
+        }))
+        .event(clone!(is_hovered => move |_: events::MouseLeave| {
+            is_hovered.set(false);
+        }))
 }
