@@ -116,8 +116,11 @@ impl Sidebar {
             }));
 
         html!("div", {
+            .class("col-span-1")
+            .class("row-span-3")
+            .class("block")
+            .style("width", &format!("{MENU_SIZE_PX}px"))
             .apply(styles::menu::body)
-            .apply(styles::sidebar_layout)
             .children(buttons)
         })
     }
@@ -125,7 +128,8 @@ impl Sidebar {
     pub fn render_panel(this: &Rc<Sidebar>, workspace_command_tx: &crate::WorkspaceCommandSender) -> impl Signal<Item = Option<Dom>> + 'static {
         this.active_panel.signal_cloned().map(clone!(this, workspace_command_tx => move |panel| {
             panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
-                .apply(styles::sidebar_layout)
+                .class("col-span-1")
+                .class("row-span-3")
                 .class_signal("hidden", this.panel_size.signal().eq(0))
                 .style_signal("width", this.panel_size.signal_ref(|s| format!("{s}px")))
                 .child(panel.render(&workspace_command_tx))
@@ -133,14 +137,13 @@ impl Sidebar {
         }))
     }
 
-    pub fn render_vert_resizer(this: &Rc<Sidebar>) -> impl Signal<Item = Option<Dom>> + 'static {
+    pub fn render_vertical_resizer(this: &Rc<Sidebar>) -> impl Signal<Item = Option<Dom>> + 'static {
         this.active_panel.signal_cloned().map(clone!(this => move |panel| {
             panel.map(clone!(this => move |_| html!("div", {
-                .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
-                .apply(styles::sidebar_layout)
-                .class("min-h-screen")
-                .class("cursor-ew-resize")
+                .class("col-span-1")
+                .class("row-span-3")
                 .style("width", &format!("{RESIZER_PX}px"))
+                .apply(|dom| styles::vertical_resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
                 .event_with_options(&EventOptions::preventable(),
                     clone!(this => move |ev: events::PointerDown| {
                     this.resize_active.set_neq(true);

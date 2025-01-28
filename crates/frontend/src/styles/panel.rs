@@ -2,14 +2,12 @@ use dominator::DomBuilder;
 use web_sys::HtmlElement;
 
 pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("block")
-        .class("h-screen")
+    dom.class("h-screen")
         .style("background-color", super::BACKGROUND_COLOR)
 }
 
 pub fn title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.apply(super::icon_text)
-        .class("h-[35px]")
         .class("pl-[1.625rem]")
         .class("pt-2.5")
         .class("m-0")

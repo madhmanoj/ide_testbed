@@ -63,7 +63,7 @@ pub async fn main() {
 
         .child_signal(Sidebar::render_panel(&sidebar, &workspace_command_tx))
 
-        .child_signal(Sidebar::render_vert_resizer(&sidebar))
+        .child_signal(Sidebar::render_vertical_resizer(&sidebar))
 
         .child(ActivityPanel::render(&workspace.activity_panel, workspace_command_rx, workspace_width, activity_panel_height))
 

@@ -2,13 +2,11 @@ use dominator::DomBuilder;
 use futures_signals::signal::{Signal, SignalExt};
 use web_sys::{HtmlElement, SvgElement};
 
-const MENU_SIZE_PX: u32 = 48;
 use super::TEXT_COLOR as MENU_BACKGROUND_COLOR;
+use super::TITLE_COLOR as TOGGLE_INACTIVE_COLOR;
 
 pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("block")
-        .class("min-h-screen")
-        .style("width", &format!("{MENU_SIZE_PX}px"))
+    dom.class("min-h-screen")
         .style("background-color", MENU_BACKGROUND_COLOR)
 }
 
@@ -27,7 +25,7 @@ pub fn button_toggle(
         if active {
             super::FOREGROUND_COLOR
         } else {
-            super::TITLE_COLOR
+            TOGGLE_INACTIVE_COLOR
         }
     }))
 }

@@ -21,11 +21,6 @@ pub fn default_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("gap-0")
 }
 
-pub fn sidebar_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("col-span-1")
-        .class("row-span-3")
-}
-
 pub fn workspace_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("col-span-1")
         .class("row-span-1")
@@ -43,6 +38,21 @@ pub fn resizer(
             BACKGROUND_COLOR
         }
     }))
+}
+
+pub fn vertical_resizer(
+    dom: DomBuilder<HtmlElement>,
+    active: impl Signal<Item = bool> + 'static,
+    hover: impl Signal<Item = bool> + 'static
+) -> DomBuilder<HtmlElement> {
+    dom.class("min-h-screen")
+        .class("cursor-ew-resize")
+        .apply(|dom| resizer(dom, active, hover))
+}
+
+pub fn welcome_icon(dom: DomBuilder<SvgElement>) -> DomBuilder<SvgElement> {
+    dom.class("h-[1.5em]")
+        .attr("fill", FEATURE_COLOR)
 }
 
 pub fn input(dom: DomBuilder<HtmlInputElement>) -> DomBuilder<HtmlInputElement> {
@@ -67,10 +77,5 @@ pub fn icon_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("gap-0")
         .class("text-inherit")
         .class("leading-5")
-}
-
-pub fn welcome_icon(dom: DomBuilder<SvgElement>) -> DomBuilder<SvgElement> {
-    dom.class("h-[1.5em]")
-        .attr("fill", FEATURE_COLOR)
 }
 
