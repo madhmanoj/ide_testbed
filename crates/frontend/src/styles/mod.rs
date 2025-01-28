@@ -21,25 +21,6 @@ pub fn default_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("gap-0")
 }
 
-pub fn workspace_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("col-span-1")
-        .class("row-span-1")
-}
-
-pub fn resizer(
-    dom: DomBuilder<HtmlElement>,
-    active: impl Signal<Item = bool> + 'static,
-    hover: impl Signal<Item = bool> + 'static
-) -> DomBuilder<HtmlElement> {
-    dom.style_signal("background-color", signal::or(active, hover).map(|flag| {
-        if flag {
-            FEATURE_COLOR
-        } else {
-            BACKGROUND_COLOR
-        }
-    }))
-}
-
 pub fn vertical_resizer(
     dom: DomBuilder<HtmlElement>,
     active: impl Signal<Item = bool> + 'static,
@@ -62,6 +43,8 @@ pub fn input(dom: DomBuilder<HtmlInputElement>) -> DomBuilder<HtmlInputElement> 
         .style("box-shadow", "none")
 }
 
+// HELPER FUNCTIONS
+
 pub fn icon(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom.class("grid")
         .class("w-6")
@@ -79,3 +62,16 @@ pub fn icon_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
         .class("leading-5")
 }
 
+pub fn resizer(
+    dom: DomBuilder<HtmlElement>,
+    active: impl Signal<Item = bool> + 'static,
+    hover: impl Signal<Item = bool> + 'static
+) -> DomBuilder<HtmlElement> {
+    dom.style_signal("background-color", signal::or(active, hover).map(|flag| {
+        if flag {
+            FEATURE_COLOR
+        } else {
+            BACKGROUND_COLOR
+        }
+    }))
+}

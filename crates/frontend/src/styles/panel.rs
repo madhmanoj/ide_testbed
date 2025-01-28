@@ -7,10 +7,10 @@ pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
 }
 
 pub fn title(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.apply(super::icon_text)
-        .class("pl-[1.625rem]")
+    dom.class("pl-[1.625rem]")
         .class("pt-2.5")
         .class("m-0")
+        .apply(super::icon_text)
 }
 
 pub fn title_text(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {

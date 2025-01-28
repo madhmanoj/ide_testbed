@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use dominator::{clone, events, Dom, EventOptions, html};
-use futures_signals::signal::Mutable;
+use futures_signals::signal::{Mutable, SignalExt};
 
 use crate::styles;
 
@@ -35,10 +35,11 @@ impl Default for Workspace {
 impl Workspace {
     pub fn render_horizontal_resizer(this: &Rc<Workspace>) -> Dom {
         html!("div", {
-            .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
-            .apply(styles::workspace_layout)
+            .class("col-span-1")
+            .class("row-span-1")
             .class("cursor-ns-resize")
             .style("height", &format!("{RESIZER_PX}px"))
+            .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
             .event_with_options(&EventOptions::preventable(),
                 clone!(this => move |ev: events::PointerDown| {
                 this.resize_active.set_neq(true);
@@ -87,8 +88,10 @@ impl Workspace {
 
     pub fn render_console(this: &Rc<Workspace>) -> Dom {
         html!("div", {
-            .apply(styles::workspace_layout)
-            .apply(|dom| styles::console::container(dom, this.console_height.signal()))
+            .class("col-span-1")
+            .class("row-span-1")
+            .style_signal("height", this.console_height.signal().map(|height| format!("{height}px")))
+            .apply(styles::console::container)
             .child(this.console.render())
         })
     }

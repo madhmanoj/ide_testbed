@@ -61,6 +61,8 @@ impl Activity {
         }));
 
         html!("div", {
+            .class("block")
+            .class("h-full")
             .apply(|dom| styles::tab::body(dom, is_active, mouse_over.signal()))
             .event(clone!(mouse_over => move |_: events::PointerOver| {
                 mouse_over.set_neq(true);
@@ -73,7 +75,6 @@ impl Activity {
             }))
             .child(html!("div", {
                 .apply(styles::icon_text)
-                .class("inline-flex")
                 .child(html!("div", {
                     .apply(styles::icon)
                     .child(this.icon())
@@ -145,9 +146,11 @@ impl ActivityPanel {
         let height = height.broadcast();
 
         html!("div", {
-            .apply(styles::default_layout)
-            .apply(styles::workspace_layout)
+            .class("col-span-1")
+            .class("row-span-1")
+            .class("grid")
             .class("grid-rows-[auto_1fr]")
+            .class("h-full")
 
             .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
                 match command {
@@ -175,6 +178,8 @@ impl ActivityPanel {
             })))
             // tabs take up one full line
             .child(html!("div", {
+                .class("inline-flex")
+                .class("h-[35px]")
                 .apply(styles::tab::bar)
                 .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
                     html!("div", {
