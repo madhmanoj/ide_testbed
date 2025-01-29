@@ -15,12 +15,6 @@ const FOREGROUND_COLOR: &str = "#ffffff"; // TOGGLE_ACTIVE_COLOR -- white
 const TITLE_COLOR: &str = "#828282"; // TOGGLE_INACTIVE_COLOR -- darkgray
 const TEXT_COLOR: &str = "#2c2c2c"; // mineshaft
 
-pub fn default_layout(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("grid")
-        .class("h-full")
-        .class("gap-0")
-}
-
 pub fn vertical_resizer(
     dom: DomBuilder<HtmlElement>,
     active: impl Signal<Item = bool> + 'static,

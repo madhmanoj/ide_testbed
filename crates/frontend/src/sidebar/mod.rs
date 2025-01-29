@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use dominator::{clone, events, Dom, EventOptions, html};
-use crate::styles;
+use crate::{styles, ColumnType, COLS};
 use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}};
 
 pub mod explorer;
@@ -106,9 +106,24 @@ impl Sidebar {
                         clone!(this, panel => move |ev: events::PointerDown| {
                             ev.prevent_default();
                             let mut active_panel = this.active_panel.lock_mut();
+                            // pressing the explorer icon to toggle the explorer panel
                             *active_panel = match &*active_panel {
-                                Some(active_panel) if Rc::ptr_eq(active_panel, &panel) => None,
-                                _ => Some(panel.clone())
+                                Some(active_panel) if Rc::ptr_eq(active_panel, &panel) => {
+                                    COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                        ColumnType::Auto,
+                                        ColumnType::Fr
+                                    ]));
+                                    None
+                                },
+                                _ => {
+                                    COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                        ColumnType::Auto,
+                                        ColumnType::Auto,
+                                        ColumnType::Auto,
+                                        ColumnType::Fr
+                                    ]));
+                                    Some(panel.clone())
+                                }
                             }
                         })
                     )
@@ -153,14 +168,20 @@ impl Sidebar {
                     this.resize_active.set_neq(false);
                     if this.panel_size.get() == 0 {
                         this.active_panel.set(None);
-                        this.panel_size.set(DEFAULT_PANEL_SIZE)
+                        // trying to close explorer panel by dragging resizer
+                        // after drag stops, both panel and resizer are set to None
+                        COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                            ColumnType::Auto,
+                            ColumnType::Fr
+                        ]));
+                        this.panel_size.set(DEFAULT_PANEL_SIZE);
                     }
                 }))
                 .event(clone!(this => move |_: events::PointerOver| {
                     this.resizer_hover.set_neq(true);
                 }))
                 .event(clone!(this => move |_: events::PointerOut| {
-                    this.resizer_hover.set_neq(false);
+                    this.resizer_hover.set_neq(false);                    
                 }))
                 .global_event(clone!(this => move |event: events::PointerMove| {
                     if this.resize_active.get() {
@@ -173,13 +194,29 @@ impl Sidebar {
                             .unwrap() as u32;
                         let panel_size_px = (event.x().max(0) as u32).saturating_sub(MENU_SIZE_PX)
                             .min(max_panel_size_px);
+                        // resizer is present until dragging operation ends
                         match panel_size_px {
                             0..=150 => {
                                 this.panel_size.set(0);
+                                // when dragging the resizer towards the menu, three columns
+                                // menu, resizer, activity area
+                                COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                    ColumnType::Auto,
+                                    ColumnType::Auto,
+                                    ColumnType::Fr
+                                ]));
                             }
                             151..=200 => {}
                             _ => {
                                 this.panel_size.set(panel_size_px);
+                                // when dragging the resizer back away from menu, four columns
+                                // menu, panel, resizer, activity area 
+                                COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                    ColumnType::Auto,
+                                    ColumnType::Auto,
+                                    ColumnType::Auto,
+                                    ColumnType::Fr
+                                ]));
                             }
                         }
                     }

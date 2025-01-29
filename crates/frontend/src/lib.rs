@@ -2,7 +2,7 @@ use std::{rc::Rc, sync::Arc};
 
 use dominator::html;
 use futures::channel::mpsc;
-use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
+use futures_signals::{map_ref, signal::SignalExt, signal_vec::{MutableVec, SignalVecExt}};
 use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use wasm_bindgen::prelude::*;
@@ -14,6 +14,28 @@ mod contextmenu;
 mod styles;
 
 const RESIZER_PX: u32 = 3;
+
+// enum RowType {
+//     Auto,
+//     Fr(usize)
+// }
+
+// let rows: MutableVec<RowType>
+//     = MutableVec::new_with_values(vec![RowType::Fr(1), RowType::Auto]);
+
+// // ...some event, e.g., splitting the workspace causes
+// rows.lock_mut().push(RowType::Auto);
+
+// // which should trigger a change in the layout using signals
+// html!("div",
+//     .style_signal("grid-template-rows", rows.signal_ref(|_| /* conversion to string */)
+// );
+
+#[derive(Clone)]
+enum ColumnType {
+    Auto,
+    Fr
+}
 
 enum WorkspaceCommand {
     OpenFile(Rc<vfs::File>),
@@ -55,9 +77,17 @@ pub async fn main() {
         map_ref!(window_height, console_height => window_height.saturating_sub(console_height + RESIZER_PX));
 
     let outer = html!("div", {
-        .apply(styles::default_layout)
-        .class("grid-cols-[auto_auto_auto_1fr]")
+        .class("grid")
+        .style_signal("grid-template-columns", COLS.with(|cols| cols.signal_vec_cloned()
+            .map(|col_type| match col_type {
+                ColumnType::Auto => "auto".to_string(),
+                ColumnType::Fr => "1fr".to_string()
+            })
+            .to_signal_cloned()
+            .map(|columns| columns.join(" "))
+        ))
         .class("grid-rows-[1fr_auto_auto]")
+        .class("h-full")
 
         .child(Sidebar::render_menu(&sidebar))
 
@@ -122,6 +152,13 @@ rclpy.shutdown()
 ";
 
 thread_local! {
+    pub static COLS: MutableVec<ColumnType> = MutableVec::new_with_values(vec![
+        ColumnType::Auto,
+        ColumnType::Auto,
+        ColumnType::Auto,
+        ColumnType::Fr
+    ]);
+
     pub static GLOBAL_LOG: Lazy<MutableVec<Arc<str>>> = Lazy::new(Default::default);
 
     pub static PROJECT: Lazy<Rc<vfs::Directory>> = Lazy::new(|| {

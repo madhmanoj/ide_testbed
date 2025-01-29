@@ -162,7 +162,7 @@ impl TabMenu {
             .apply(styles::contextmenu::body)
             .children(&mut [
                 html!("div", {
-                    .text("Split Pane")
+                    .text("Split Up")
                     .apply(styles::contextmenu::option)
                 })
             ])
