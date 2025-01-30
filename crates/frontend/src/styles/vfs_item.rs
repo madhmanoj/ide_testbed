@@ -1,13 +1,15 @@
 use dominator::DomBuilder;
 use web_sys::HtmlElement;
 
-pub fn list(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("pl-5")
+pub fn list(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom_builder
+        .class("pl-5")
         .class("pt-0")
 }
 
 pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.apply(super::icon_text)
+    dom
+        .apply(super::icon_text)
         // this grid doesnt change it is just there to make the icon for file and the filename remain inline
         // so we can leave it in styles
         .class("grid")
@@ -17,6 +19,7 @@ pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
 }
 
 pub fn icon(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.apply(super::icon)
+    dom
+        .apply(super::icon)
         .class("mr-0")
 }

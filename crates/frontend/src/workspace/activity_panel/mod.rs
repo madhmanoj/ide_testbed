@@ -108,25 +108,28 @@ impl Activity {
 
             // rendering tab menu
             .child_signal(tab_menu.signal_ref(|menu_state| {
-                menu_state.as_ref().map(|menu| {
-                    TabMenu::render(menu)
-                })
+                menu_state.as_ref().map(TabMenu::render)
             }))
             // event handler for tab context menu
-            .event(clone!(tab_menu => move |event: events::ContextMenu| {
+            .event(clone!(panel, tab_menu => move |event: events::ContextMenu| {
                 tab_menu.set(Some(TabMenu::new(
-                    (event.x(), event.y())
+                    (event.x(), event.y()),
+                    panel.active_activity.clone()
                 )));
             }))
             // prevents default chrome context menu for the the tab bar
             .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
                 event.prevent_default();
             })
-            // global event listener to close tab menu
+            // global event listener to close tab menu if context menu is opened
             .global_event(clone!(tab_menu => move |event: events::MouseDown| {
-                if event.button() == MouseButton::Left || event.button() == MouseButton::Right {
+                if event.button() == MouseButton::Right {
                     tab_menu.set(None)
                 }
+            }))
+            // global event listener to close tab menu
+            .global_event(clone!(tab_menu => move |_: events::Click| {
+                tab_menu.set(None);
             }))
         })
         

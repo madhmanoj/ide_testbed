@@ -2,17 +2,19 @@ use dominator::{clone, events, DomBuilder};
 use futures_signals::signal::{Mutable, SignalExt};
 use web_sys::HtmlElement;
 
-pub fn body(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("p-1")
+pub fn body(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom_builder
+        .class("p-1")
         .class("border-transparent")
         .class("rounded")
         .class("shadow-md") 
         .style("background-color", super::FOREGROUND_COLOR)
 }
 
-pub fn option(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+pub fn option(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     let is_hovered = Mutable::new(false);
-    dom.class("pl-5")
+    dom_builder
+        .class("pl-5")
         .class("pt-0.5")
         .class("hover:rounded")
         .class("text-[0.9rem]")

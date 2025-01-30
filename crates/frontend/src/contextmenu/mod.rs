@@ -1,7 +1,9 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
+use futures_signals::signal::Mutable;
 use crate::sidebar::explorer::RENAME;
-use crate::styles;
+use crate::workspace::activity_panel;
+use crate::{styles, ColumnType, COLS};
 use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
 #[derive(Clone)]
 pub enum Target {
@@ -38,21 +40,22 @@ impl ContextMenu {
                 html!("div", {
                     .text("New Folder")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
                         context_menu.add_folder();
                     }))
                 }), 
                 html!("div", {
                     .text("New File")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
                         context_menu.add_file();
                     }))
                 }),
                 html!("div", {
                     .text("Rename Folder")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
+                        web_sys::console::log_1(&"Hello bois".into());
                         if let Target::Directory(dir) = &context_menu.target  {
                             RENAME.with(|rename| {
                                 rename.set(Some(Target::Directory(dir.clone())));
@@ -78,7 +81,7 @@ impl ContextMenu {
                 html!("div", {
                     .text("Rename File")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_event: events::MouseDown| {
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
                         if let Target::File(file) = &context_menu.target  {
                             RENAME.with(|rename| {
                                 rename.set(Some(Target::File(file.clone())));
@@ -141,17 +144,21 @@ impl ContextMenu {
 pub struct TabMenu {
     // position of the tab context menu
     pub position: (i32, i32),
+    // target activity
+    pub activity_panel: Mutable<Option<Rc<activity_panel::Activity>>>
 }
 
 impl TabMenu {
-    pub fn new(position: (i32, i32)) -> Self {
+    pub fn new(position: (i32, i32), activity_panel: Mutable<Option<Rc<activity_panel::Activity>>>) -> Self {
         Self {
-            position
+            position,
+            activity_panel
         }
     }
 
     pub fn render(
-        tab_menu: &TabMenu
+        tab_menu: &TabMenu,
+        
     ) -> Dom {
         html!("div", {
             .class("absolute")
@@ -162,8 +169,14 @@ impl TabMenu {
             .apply(styles::contextmenu::body)
             .children(&mut [
                 html!("div", {
-                    .text("Split Up")
+                    .text("Split Right")
                     .apply(styles::contextmenu::option)
+                    .event(|_: events::MouseDown| {
+                        COLS.with(|cols| cols.lock_mut().extend(vec![
+                            ColumnType::Auto,
+                            ColumnType::Fr
+                        ]))
+                    })
                 })
             ])
         })

@@ -55,7 +55,7 @@ pub async fn main() {
         .init();
 
     use sidebar::Sidebar;
-    use workspace::{Workspace, activity_panel::ActivityPanel};
+    use workspace::Workspace;
 
     let (workspace_command_tx, workspace_command_rx) = mpsc::unbounded();
 
@@ -95,7 +95,7 @@ pub async fn main() {
 
         .child_signal(Sidebar::render_vertical_resizer(&sidebar))
 
-        .child(ActivityPanel::render(&workspace.activity_panel, workspace_command_rx, workspace_width, activity_panel_height))
+        .children_signal_vec(Workspace::render_activity_panel(&workspace, workspace_command_rx, workspace_width, activity_panel_height))
 
         .child(Workspace::render_horizontal_resizer(&workspace))
 
