@@ -30,9 +30,9 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .class("absolute")
-            .class("z-[1000]")
-            .class("w-60")
+            .style("position", "absolute")
+            .style("z-index", "1000")
+            .style("width", "15rem")
             .style("left", &format!("{}px", context_menu.position.0)) // X position
             .style("top", &format!("{}px", context_menu.position.1))  // Y position
             .apply(styles::contextmenu::body)
@@ -71,9 +71,9 @@ impl ContextMenu {
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .class("absolute")
-            .class("z-[1000]")
-            .class("w-60")
+            .style("position", "absolute")
+            .style("z-index", "1000")
+            .style("width", "15rem")
             .style("left", &format!("{}px", context_menu.position.0)) // X position
             .style("top", &format!("{}px", context_menu.position.1))  // Y position
             .apply(styles::contextmenu::body)
@@ -161,9 +161,9 @@ impl TabMenu {
         
     ) -> Dom {
         html!("div", {
-            .class("absolute")
-            .class("z-[1000]")
-            .class("w-60")
+            .style("position", "absolute")
+            .style("z-index", "1000")
+            .style("width", "15rem")
             .style("left", &format!("{}px", tab_menu.position.0)) // X position
             .style("top", &format!("{}px", tab_menu.position.1))  // Y position
             .apply(styles::contextmenu::body)

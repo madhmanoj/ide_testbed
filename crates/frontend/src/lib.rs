@@ -15,22 +15,6 @@ mod styles;
 
 const RESIZER_PX: u32 = 3;
 
-// enum RowType {
-//     Auto,
-//     Fr(usize)
-// }
-
-// let rows: MutableVec<RowType>
-//     = MutableVec::new_with_values(vec![RowType::Fr(1), RowType::Auto]);
-
-// // ...some event, e.g., splitting the workspace causes
-// rows.lock_mut().push(RowType::Auto);
-
-// // which should trigger a change in the layout using signals
-// html!("div",
-//     .style_signal("grid-template-rows", rows.signal_ref(|_| /* conversion to string */)
-// );
-
 #[derive(Clone)]
 enum ColumnType {
     Auto,
