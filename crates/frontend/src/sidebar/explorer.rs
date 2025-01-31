@@ -216,7 +216,7 @@ fn render_contents(
                     let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
                     if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                         workspace_command_tx
-                            .unbounded_send(crate::WorkspaceCommand::OpenFile(file.clone()))
+                            .unbounded_send(crate::WorkspaceCommand::OpenFile(None, file.clone()))
                             .unwrap()
                     }
                 }))

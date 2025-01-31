@@ -1,11 +1,13 @@
 use std::{rc::Rc, sync::Arc};
 
-use dominator::html;
-use futures::channel::mpsc;
+use dominator::{clone, html};
+use futures::{channel::mpsc, StreamExt};
 use futures_signals::{map_ref, signal::SignalExt, signal_vec::{MutableVec, SignalVecExt}};
 use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
+use uuid::Uuid;
 use wasm_bindgen::prelude::*;
+use workspace::activity_panel::ActivityPanelCommand;
 
 mod sidebar;
 mod workspace;
@@ -22,7 +24,7 @@ enum ColumnType {
 }
 
 enum WorkspaceCommand {
-    OpenFile(Rc<vfs::File>),
+    OpenFile(Option<Uuid>, Rc<vfs::File>),
 }
 type WorkspaceCommandSender = mpsc::UnboundedSender<WorkspaceCommand>;
 type WorkspaceCommandReceiver = mpsc::UnboundedReceiver<WorkspaceCommand>;
@@ -61,6 +63,22 @@ pub async fn main() {
         map_ref!(window_height, console_height => window_height.saturating_sub(console_height + RESIZER_PX));
 
     let outer = html!("div", {
+
+        .future(workspace_command_rx.for_each(clone!(workspace => move |command| clone!(workspace => async move {
+            match command {
+                WorkspaceCommand::OpenFile(Some(uuid), file) => {
+                    if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&uuid) {
+                        activity_panel.activity_panel_tx.unbounded_send(ActivityPanelCommand::OpenFile(file.clone())).unwrap();
+                    }
+                },
+                WorkspaceCommand::OpenFile(None, file) => {
+                    if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&workspace.last_active_panel.lock_ref()) {
+                        activity_panel.activity_panel_tx.unbounded_send(ActivityPanelCommand::OpenFile(file.clone())).unwrap();
+                    }
+                }
+            }
+        }))))
+
         .class("grid")
         .style_signal("grid-template-columns", COLS.with(|cols| cols.signal_vec_cloned()
             .map(|col_type| match col_type {
@@ -79,7 +97,7 @@ pub async fn main() {
 
         .child_signal(Sidebar::render_vertical_resizer(&sidebar))
 
-        .children_signal_vec(Workspace::render_activity_panel(&workspace, workspace_command_rx, workspace_width, activity_panel_height))
+        .children_signal_vec(Workspace::render_activity_panel(&workspace, workspace_width, activity_panel_height))
 
         .child(Workspace::render_horizontal_resizer(&workspace))
 

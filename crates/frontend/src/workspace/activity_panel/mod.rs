@@ -1,16 +1,20 @@
 use std::{pin::Pin, rc::Rc};
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions};
-use futures::StreamExt;
+use futures::{channel::mpsc::{self, UnboundedReceiver, UnboundedSender}, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 
-use crate::styles;
+use crate::{styles, vfs};
 use crate::contextmenu::TabMenu;
 
 pub mod editor;
 pub mod welcome;
 
 const TAB_HEIGHT: u32 = 35;
+
+pub enum ActivityPanelCommand {
+    OpenFile(Rc<vfs::File>)
+}
 
 pub enum Activity {
     Editor(Rc<editor::Editor>),
@@ -138,19 +142,22 @@ impl Activity {
 
 pub struct ActivityPanel {
     activities: MutableVec<Rc<Activity>>,
-    active_activity: Mutable<Option<Rc<Activity>>>
+    active_activity: Mutable<Option<Rc<Activity>>>,
+    pub activity_panel_tx: UnboundedSender<ActivityPanelCommand>
 }
 
-impl Default for ActivityPanel {
-    fn default() -> Self {
-        let welcome = Rc::new(Activity::Welcome(Rc::new(welcome::Welcome::new())));
+// impl Default for ActivityPanel {
+//     fn default() -> Self {
         
-        Self {
-            activities: vec![welcome.clone()].into(),
-            active_activity: Some(welcome).into()
-        }
-    }
-}
+//         let (tx,rx) = mpsc::unbounded();
+        
+//         Self {
+//             activities: vec![welcome.clone()].into(),
+//             active_activity: Some(welcome).into(),
+//             activity_panel_tx: tx
+//         }
+//     }
+// }
 
 // clicking a file in the explorer opens the file in the editor
 // perhaps we just have a channel over which we send mutables? such that content can be synchronised
@@ -162,9 +169,39 @@ const CLOSE_ICON_PATH: &str = "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L
 
 impl ActivityPanel {
 
+    pub fn new() -> Rc<Self> {
+        let welcome = Rc::new(Activity::Welcome(Rc::new(welcome::Welcome::new())));
+        let (tx, rx) = mpsc::unbounded();
+        let panel = Rc::new(Self {
+            activities: vec![welcome.clone()].into(),
+            active_activity: Some(welcome).into(),
+            activity_panel_tx: tx
+        });
+
+        wasm_bindgen_futures::spawn_local(rx.for_each(clone!(panel => move |command| clone!(panel => async move {
+            match command {
+                ActivityPanelCommand::OpenFile(file) => {
+                    let mut activities = panel.activities.lock_mut();
+                    let editor = activities.iter()
+                        .find(|activity| match &***activity {
+                            Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
+                            _ => false,
+                        })
+                        .cloned()
+                        .unwrap_or_else(move || {
+                            let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
+                            activities.push_cloned(editor.clone());
+                            editor
+                        });
+                    panel.active_activity.set(Some(editor));
+                },
+            }
+        }))));
+        panel
+    }
+
     pub fn render(
         this: &Rc<ActivityPanel>,
-        workspace_command_rx: crate::WorkspaceCommandReceiver,
         width: impl Signal<Item = u32> + 'static,
         height: impl Signal<Item = u32> + 'static
     ) -> dominator::Dom {
@@ -180,25 +217,26 @@ impl ActivityPanel {
             .class("grid-rows-[auto_1fr]")
             .class("h-full")
 
-            .future(workspace_command_rx.for_each(clone!(this => move |command| clone!(this => async move {
-                match command {
-                    crate::WorkspaceCommand::OpenFile(file) => {
-                        let mut activities = this.activities.lock_mut();
-                        let editor = activities.iter()
-                            .find(|activity| match &***activity {
-                                Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
-                                _ => false,
-                            })
-                            .cloned()
-                            .unwrap_or_else(move || {
-                                let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
-                                activities.push_cloned(editor.clone());
-                                editor
-                            });
-                        this.active_activity.set(Some(editor));
-                    },
-                }
-            }))))
+            // .future(activity_panel_rx.for_each(clone!(this => move |command| clone!(this => async move {
+            //     match command {
+            //         ActivityPanelCommand::OpenFile(file) => {
+            //             let mut activities = this.activities.lock_mut();
+            //             let editor = activities.iter()
+            //                 .find(|activity| match &***activity {
+            //                     Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
+            //                     _ => false,
+            //                 })
+            //                 .cloned()
+            //                 .unwrap_or_else(move || {
+            //                     let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
+            //                     activities.push_cloned(editor.clone());
+            //                     editor
+            //                 });
+            //             this.active_activity.set(Some(editor));
+            //         },
+            //     }
+            // }))))
+            
             // this takes up the full height but should only display when there are no activities
             // and hence no tab bar
             .child_signal(activity_count.signal().map(clone!(height => move |count| {

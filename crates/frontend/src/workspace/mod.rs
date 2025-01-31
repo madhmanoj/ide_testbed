@@ -1,7 +1,10 @@
-use std::rc::Rc;
+use std::{collections::BTreeMap, ops::Deref, rc::Rc};
 
-use dominator::{clone, events, Dom, EventOptions, html};
-use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVec, SignalVecExt}};
+use activity_panel::{ActivityPanel, ActivityPanelCommand};
+use dominator::{clone, events, html, Dom, EventOptions};
+use futures::channel::mpsc::UnboundedReceiver;
+use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_map::{MapValueSignal, MutableBTreeMap, MutableSignalMap, SignalMapExt}, signal_vec::{SignalVec, SignalVecExt}};
+use uuid::Uuid;
 use crate::styles;
 
 pub mod console;
@@ -11,38 +14,44 @@ const DEFAULT_CONSOLE_HEIGHT: u32 = 200;
 const RESIZER_PX: u32 = 3;
 
 pub struct Workspace {
-    pub activity_panel_list: MutableVec<Rc<activity_panel::ActivityPanel>>,
+    pub activity_panel_list: MutableBTreeMap<Uuid, Rc<activity_panel::ActivityPanel>>,
     console: Rc<console::Console>,
     pub console_height: Mutable<u32>,
     resize_active: Mutable<bool>,
-    resizer_hover: Mutable<bool>
+    resizer_hover: Mutable<bool>,
+    pub last_active_panel: Mutable<Uuid>
 }
 
 impl Default for Workspace {
     fn default() -> Self {
+        let uuid = Uuid::new_v4();
+
         Self {
-            activity_panel_list: Default::default(),
+            activity_panel_list: MutableBTreeMap::with_values(BTreeMap::from([
+                (uuid, ActivityPanel::new())
+            ])),
             console: Default::default(),
             console_height: Mutable::new(DEFAULT_CONSOLE_HEIGHT),
             resize_active: Mutable::new(false),
             resizer_hover: Mutable::new(false),
+            last_active_panel: Mutable::new(uuid)
         }
     }
 }
    
 // part of the problem is that I need to respond to the user moving the mouse, but also the size of the window
 impl Workspace {
+    
     pub fn render_activity_panel(
         this: &Rc<Workspace>,
-        workspace_command_rx: crate::WorkspaceCommandReceiver,
         width: impl Signal<Item = u32> + 'static,
         height: impl Signal<Item = u32> + 'static
     ) -> impl SignalVec<Item = Dom> + 'static {
         let width = width.broadcast();
         let height = height.broadcast();
 
-        this.activity_panel_list.signal_vec_cloned().map(clone!(height, width => move |panel| {
-            activity_panel::ActivityPanel::render(&panel, workspace_command_rx, width.signal(), height.signal())
+        this.activity_panel_list.entries_cloned().map(clone!(width, height => move |(_, panel)| {
+            ActivityPanel::render(&panel, width.signal(), height.signal())
         }))
     }
 
