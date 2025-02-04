@@ -1,9 +1,8 @@
-use std::{collections::BTreeMap, ops::Deref, rc::Rc};
+use std::{collections::BTreeMap, rc::Rc};
 
-use activity_panel::{ActivityPanel, ActivityPanelCommand};
+use activity_panel::ActivityPanel;
 use dominator::{clone, events, html, Dom, EventOptions};
-use futures::channel::mpsc::UnboundedReceiver;
-use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_map::{MapValueSignal, MutableBTreeMap, MutableSignalMap, SignalMapExt}, signal_vec::{SignalVec, SignalVecExt}};
+use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_map::MutableBTreeMap, signal_vec::{MutableVec, SignalVecExt}};
 use uuid::Uuid;
 use crate::styles;
 
@@ -13,13 +12,20 @@ pub mod activity_panel;
 const DEFAULT_CONSOLE_HEIGHT: u32 = 200;
 const RESIZER_PX: u32 = 3;
 
+#[derive(Clone)]
+pub enum ColumnType {
+    Auto,
+    Fr
+}
+
 pub struct Workspace {
     pub activity_panel_list: MutableBTreeMap<Uuid, Rc<activity_panel::ActivityPanel>>,
     console: Rc<console::Console>,
     pub console_height: Mutable<u32>,
     resize_active: Mutable<bool>,
     resizer_hover: Mutable<bool>,
-    pub last_active_panel: Mutable<Uuid>
+    pub last_active_panel: Mutable<Uuid>,
+    pub cols: MutableVec<ColumnType>
 }
 
 impl Default for Workspace {
@@ -28,13 +34,17 @@ impl Default for Workspace {
 
         Self {
             activity_panel_list: MutableBTreeMap::with_values(BTreeMap::from([
-                (uuid, ActivityPanel::new())
+                (uuid, ActivityPanel::default())
             ])),
             console: Default::default(),
             console_height: Mutable::new(DEFAULT_CONSOLE_HEIGHT),
             resize_active: Mutable::new(false),
             resizer_hover: Mutable::new(false),
-            last_active_panel: Mutable::new(uuid)
+            last_active_panel: Mutable::new(uuid),
+            cols: MutableVec::new_with_values(vec![
+                ColumnType::Fr,
+                ColumnType::Fr
+            ])
         }
     }
 }
@@ -46,13 +56,25 @@ impl Workspace {
         this: &Rc<Workspace>,
         width: impl Signal<Item = u32> + 'static,
         height: impl Signal<Item = u32> + 'static
-    ) -> impl SignalVec<Item = Dom> + 'static {
+    ) -> Dom {
         let width = width.broadcast();
         let height = height.broadcast();
 
-        this.activity_panel_list.entries_cloned().map(clone!(width, height => move |(_, panel)| {
-            ActivityPanel::render(&panel, width.signal(), height.signal())
-        }))
+        html!("div", {
+            // .style_signal("grid-template-columns", COLS.with(|cols| cols.signal_vec_cloned()
+            //     .map(|col_type| match col_type {
+            //         ColumnType::Auto => "auto".to_string(),
+            //         ColumnType::Fr => "1fr".to_string()
+            //     })
+            //     .to_signal_cloned()
+            //     .map(|columns| columns.join(" "))
+            // ))
+            .class("col-span-1")
+            .class("row-span-1")
+            .children_signal_vec(this.activity_panel_list.entries_cloned().map(clone!(this, width, height => move |(_, panel)| {
+                ActivityPanel::render(&this, &panel, width.signal(), height.signal())
+            })))
+        })
     }
 
     pub fn render_horizontal_resizer(this: &Rc<Workspace>) -> Dom {

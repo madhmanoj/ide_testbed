@@ -1,10 +1,8 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
-use futures_signals::signal::Mutable;
-use crate::sidebar::explorer::RENAME;
-use crate::workspace::activity_panel;
-use crate::{styles, ColumnType, COLS};
-use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
+use uuid::Uuid;
+use crate::workspace::{activity_panel::{ActivityPanel, Activity}, Workspace, ColumnType};
+use crate::{styles, vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE, sidebar::explorer::RENAME};
 #[derive(Clone)]
 pub enum Target {
     File(Rc<File>), 
@@ -143,22 +141,20 @@ impl ContextMenu {
 
 pub struct TabMenu {
     // position of the tab context menu
-    pub position: (i32, i32),
-    // target activity
-    pub activity_panel: Mutable<Option<Rc<activity_panel::Activity>>>
+    pub position: (i32, i32)
 }
 
 impl TabMenu {
-    pub fn new(position: (i32, i32), activity_panel: Mutable<Option<Rc<activity_panel::Activity>>>) -> Self {
+    pub fn new(position: (i32, i32)) -> Self {
         Self {
-            position,
-            activity_panel
+            position
         }
     }
 
     pub fn render(
         tab_menu: &TabMenu,
-        
+        workspace: &Rc<Workspace>,
+        activity: &Rc<Activity>
     ) -> Dom {
         html!("div", {
             .style("position", "absolute")
@@ -171,14 +167,25 @@ impl TabMenu {
                 html!("div", {
                     .text("Split Right")
                     .apply(styles::contextmenu::option)
-                    .event(|_: events::MouseDown| {
-                        COLS.with(|cols| cols.lock_mut().extend(vec![
-                            ColumnType::Auto,
-                            ColumnType::Fr
-                        ]))
-                    })
+                    .event(clone!(workspace, activity => move |_: events::MouseDown| {
+                        TabMenu::split_panel(&workspace, &activity);
+                    }))
                 })
             ])
         })
+    }
+
+    pub fn split_panel(
+        workspace: &Rc<Workspace>,
+        activity: &Rc<Activity>
+    ) -> () {
+        let new_uuid = Uuid::new_v4();
+        let new_panel = ActivityPanel::new(activity);
+
+        workspace.cols.lock_mut().extend(vec![ColumnType::Fr]);
+
+        workspace.activity_panel_list.lock_mut().insert_cloned(new_uuid, new_panel);
+
+        workspace.last_active_panel.set(new_uuid);
     }
 }

@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use dominator::{clone, events, Dom, EventOptions, html};
-use crate::{styles, ColumnType, COLS};
-use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}};
+use crate::{styles, workspace::ColumnType};
+use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}, signal_vec::MutableVec};
 
 pub mod explorer;
 pub mod search;
@@ -80,7 +80,10 @@ impl Sidebar {
         }
     }
 
-    pub fn render_menu(this: &Rc<Sidebar>) -> Dom {
+    pub fn render_menu(
+        this: &Rc<Sidebar>,
+        cols: MutableVec<ColumnType>
+    ) -> Dom {
         let buttons = this.panels.iter()
             .map(clone!(this => move |panel| {
                 let mouse_over = Mutable::new(false);
@@ -103,25 +106,25 @@ impl Sidebar {
                     }))
                     .event_with_options(
                         &EventOptions::preventable(),
-                        clone!(this, panel => move |ev: events::PointerDown| {
+                        clone!(this, panel, cols => move |ev: events::PointerDown| {
                             ev.prevent_default();
                             let mut active_panel = this.active_panel.lock_mut();
                             // pressing the explorer icon to toggle the explorer panel
                             *active_panel = match &*active_panel {
                                 Some(active_panel) if Rc::ptr_eq(active_panel, &panel) => {
-                                    COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                    cols.lock_mut().replace_cloned(vec![
                                         ColumnType::Auto,
                                         ColumnType::Fr
-                                    ]));
+                                    ]);
                                     None
                                 },
                                 _ => {
-                                    COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                    cols.lock_mut().replace_cloned(vec![
                                         ColumnType::Auto,
                                         ColumnType::Auto,
                                         ColumnType::Auto,
                                         ColumnType::Fr
-                                    ]));
+                                    ]);
                                     Some(panel.clone())
                                 }
                             }
@@ -152,9 +155,12 @@ impl Sidebar {
         }))
     }
 
-    pub fn render_vertical_resizer(this: &Rc<Sidebar>) -> impl Signal<Item = Option<Dom>> + 'static {
+    pub fn render_vertical_resizer(
+        this: &Rc<Sidebar>,
+        cols: MutableVec<ColumnType>
+    ) -> impl Signal<Item = Option<Dom>> + 'static {
         this.active_panel.signal_cloned().map(clone!(this => move |panel| {
-            panel.map(clone!(this => move |_| html!("div", {
+            panel.map(clone!(this, cols => move |_| html!("div", {
                 .class("col-span-1")
                 .class("row-span-3")
                 .style("width", &format!("{RESIZER_PX}px"))
@@ -164,16 +170,16 @@ impl Sidebar {
                     this.resize_active.set_neq(true);
                     ev.prevent_default();
                 }))
-                .global_event(clone!(this => move |_: events::PointerUp| {
+                .global_event(clone!(this, cols => move |_: events::PointerUp| {
                     this.resize_active.set_neq(false);
                     if this.panel_size.get() == 0 {
                         this.active_panel.set(None);
                         // trying to close explorer panel by dragging resizer
                         // after drag stops, both panel and resizer are set to None
-                        COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                        cols.lock_mut().replace_cloned(vec![
                             ColumnType::Auto,
                             ColumnType::Fr
-                        ]));
+                        ]);
                         this.panel_size.set(DEFAULT_PANEL_SIZE);
                     }
                 }))
@@ -183,7 +189,7 @@ impl Sidebar {
                 .event(clone!(this => move |_: events::PointerOut| {
                     this.resizer_hover.set_neq(false);                    
                 }))
-                .global_event(clone!(this => move |event: events::PointerMove| {
+                .global_event(clone!(this, cols => move |event: events::PointerMove| {
                     if this.resize_active.get() {
                         let max_panel_size_px = web_sys::window()
                             .unwrap()
@@ -200,23 +206,23 @@ impl Sidebar {
                                 this.panel_size.set(0);
                                 // when dragging the resizer towards the menu, three columns
                                 // menu, resizer, activity area
-                                COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                cols.lock_mut().replace_cloned(vec![
                                     ColumnType::Auto,
                                     ColumnType::Auto,
                                     ColumnType::Fr
-                                ]));
+                                ]);
                             }
                             151..=200 => {}
                             _ => {
                                 this.panel_size.set(panel_size_px);
                                 // when dragging the resizer back away from menu, four columns
                                 // menu, panel, resizer, activity area 
-                                COLS.with(|cols| cols.lock_mut().replace_cloned(vec![
+                                cols.lock_mut().replace_cloned(vec![
                                     ColumnType::Auto,
                                     ColumnType::Auto,
                                     ColumnType::Auto,
                                     ColumnType::Fr
-                                ]));
+                                ]);
                             }
                         }
                     }

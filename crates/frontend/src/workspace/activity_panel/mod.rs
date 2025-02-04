@@ -1,11 +1,12 @@
 use std::{pin::Pin, rc::Rc};
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions};
-use futures::{channel::mpsc::{self, UnboundedReceiver, UnboundedSender}, StreamExt};
+use futures::{channel::mpsc::{self, UnboundedSender}, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 
 use crate::{styles, vfs};
 use crate::contextmenu::TabMenu;
+use super::Workspace;
 
 pub mod editor;
 pub mod welcome;
@@ -48,6 +49,7 @@ impl Activity {
     }
 
     fn render_tab(
+        workspace: &Rc<Workspace>,
         this: &Rc<Activity>,
         panel: &Rc<ActivityPanel>
     ) -> dominator::Dom {
@@ -109,16 +111,20 @@ impl Activity {
                     }))
                 })
             }))
-
             // rendering tab menu
-            .child_signal(tab_menu.signal_ref(|menu_state| {
-                menu_state.as_ref().map(TabMenu::render)
-            }))
+            .child_signal(tab_menu.signal_ref(clone!(workspace, panel => move |menu_state| {
+                menu_state.as_ref().map(clone!(workspace, panel => move |menu| {
+                    if let Some(activity) = panel.active_activity.lock_ref().as_ref() {
+                        TabMenu::render(menu, &workspace, activity)
+                    }  else {
+                        Dom::empty()
+                    }        
+                }))
+            })))
             // event handler for tab context menu
-            .event(clone!(panel, tab_menu => move |event: events::ContextMenu| {
+            .event(clone!(tab_menu => move |event: events::ContextMenu| {
                 tab_menu.set(Some(TabMenu::new(
-                    (event.x(), event.y()),
-                    panel.active_activity.clone()
+                    (event.x(), event.y())
                 )));
             }))
             // prevents default chrome context menu for the the tab bar
@@ -146,19 +152,6 @@ pub struct ActivityPanel {
     pub activity_panel_tx: UnboundedSender<ActivityPanelCommand>
 }
 
-// impl Default for ActivityPanel {
-//     fn default() -> Self {
-        
-//         let (tx,rx) = mpsc::unbounded();
-        
-//         Self {
-//             activities: vec![welcome.clone()].into(),
-//             active_activity: Some(welcome).into(),
-//             activity_panel_tx: tx
-//         }
-//     }
-// }
-
 // clicking a file in the explorer opens the file in the editor
 // perhaps we just have a channel over which we send mutables? such that content can be synchronised
 // how do I determine if a file is already open? Files should be uniquely identifiable from their
@@ -169,7 +162,7 @@ const CLOSE_ICON_PATH: &str = "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L
 
 impl ActivityPanel {
 
-    pub fn new() -> Rc<Self> {
+    pub fn default() -> Rc<Self> {
         let welcome = Rc::new(Activity::Welcome(Rc::new(welcome::Welcome::new())));
         let (tx, rx) = mpsc::unbounded();
         let panel = Rc::new(Self {
@@ -200,7 +193,38 @@ impl ActivityPanel {
         panel
     }
 
+    pub fn new(activity: &Rc<Activity>) -> Rc<Self> {
+        let (tx, rx) = mpsc::unbounded();
+        let panel = Rc::new(Self {
+            activities: vec![activity.clone()].into(),
+            active_activity: Some(activity.clone()).into(),
+            activity_panel_tx: tx
+        });
+
+        wasm_bindgen_futures::spawn_local(rx.for_each(clone!(panel => move |command| clone!(panel => async move {
+            match command {
+                ActivityPanelCommand::OpenFile(file) => {
+                    let mut activities = panel.activities.lock_mut();
+                    let editor = activities.iter()
+                        .find(|activity| match &***activity {
+                            Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
+                            _ => false,
+                        })
+                        .cloned()
+                        .unwrap_or_else(move || {
+                            let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
+                            activities.push_cloned(editor.clone());
+                            editor
+                        });
+                    panel.active_activity.set(Some(editor));
+                },
+            }
+        }))));
+        panel
+    }
+
     pub fn render(
+        workspace: &Rc<Workspace>,
         this: &Rc<ActivityPanel>,
         width: impl Signal<Item = u32> + 'static,
         height: impl Signal<Item = u32> + 'static
@@ -217,26 +241,6 @@ impl ActivityPanel {
             .class("grid-rows-[auto_1fr]")
             .class("h-full")
 
-            // .future(activity_panel_rx.for_each(clone!(this => move |command| clone!(this => async move {
-            //     match command {
-            //         ActivityPanelCommand::OpenFile(file) => {
-            //             let mut activities = this.activities.lock_mut();
-            //             let editor = activities.iter()
-            //                 .find(|activity| match &***activity {
-            //                     Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
-            //                     _ => false,
-            //                 })
-            //                 .cloned()
-            //                 .unwrap_or_else(move || {
-            //                     let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
-            //                     activities.push_cloned(editor.clone());
-            //                     editor
-            //                 });
-            //             this.active_activity.set(Some(editor));
-            //         },
-            //     }
-            // }))))
-            
             // this takes up the full height but should only display when there are no activities
             // and hence no tab bar
             .child_signal(activity_count.signal().map(clone!(height => move |count| {
@@ -247,10 +251,10 @@ impl ActivityPanel {
                 .class("inline-flex")
                 .class("h-[35px]")
                 .apply(styles::tab::bar)
-                .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this => move |activity| {
+                .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this, workspace => move |activity| {
                     html!("div", {
                         .class("h-full")
-                        .child(Activity::render_tab(&activity, &this))
+                        .child(Activity::render_tab(&workspace, &activity, &this))
                     })
                 })))
             }))

@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
-use workspace::activity_panel::ActivityPanelCommand;
+use workspace::{activity_panel::ActivityPanelCommand, ColumnType};
 
 mod sidebar;
 mod workspace;
@@ -17,17 +17,11 @@ mod styles;
 
 const RESIZER_PX: u32 = 3;
 
-#[derive(Clone)]
-enum ColumnType {
-    Auto,
-    Fr
-}
-
 enum WorkspaceCommand {
     OpenFile(Option<Uuid>, Rc<vfs::File>),
 }
 type WorkspaceCommandSender = mpsc::UnboundedSender<WorkspaceCommand>;
-type WorkspaceCommandReceiver = mpsc::UnboundedReceiver<WorkspaceCommand>;
+// type WorkspaceCommandReceiver = mpsc::UnboundedReceiver<WorkspaceCommand>;
 
 #[wasm_bindgen(start)]
 pub async fn main() {
@@ -62,42 +56,54 @@ pub async fn main() {
     let activity_panel_height = 
         map_ref!(window_height, console_height => window_height.saturating_sub(console_height + RESIZER_PX));
 
+    // signal resetting div layout based on sidebar resizing
+    let global_cols = MutableVec::new_with_values(vec![
+        ColumnType::Auto,
+        ColumnType::Auto,
+        ColumnType::Auto,
+        ColumnType::Fr
+    ]);
+
     let outer = html!("div", {
 
         .future(workspace_command_rx.for_each(clone!(workspace => move |command| clone!(workspace => async move {
             match command {
-                WorkspaceCommand::OpenFile(Some(uuid), file) => {
-                    if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&uuid) {
-                        activity_panel.activity_panel_tx.unbounded_send(ActivityPanelCommand::OpenFile(file.clone())).unwrap();
-                    }
-                },
-                WorkspaceCommand::OpenFile(None, file) => {
-                    if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&workspace.last_active_panel.lock_ref()) {
-                        activity_panel.activity_panel_tx.unbounded_send(ActivityPanelCommand::OpenFile(file.clone())).unwrap();
+                WorkspaceCommand::OpenFile(maybe_uuid, file) => {
+                    if let Some(uuid) = maybe_uuid {
+                        if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&uuid) {
+                            activity_panel
+                                .activity_panel_tx
+                                .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
+                                .unwrap();
+                        }
+                    } else if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&workspace.last_active_panel.lock_ref()) {
+                        activity_panel
+                            .activity_panel_tx
+                            .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
+                            .unwrap();
                     }
                 }
-            }
+            }            
         }))))
-
         .class("grid")
-        .style_signal("grid-template-columns", COLS.with(|cols| cols.signal_vec_cloned()
+        .style_signal("grid-template-columns", global_cols.signal_vec_cloned()
             .map(|col_type| match col_type {
                 ColumnType::Auto => "auto".to_string(),
                 ColumnType::Fr => "1fr".to_string()
             })
             .to_signal_cloned()
             .map(|columns| columns.join(" "))
-        ))
+        )
         .class("grid-rows-[1fr_auto_auto]")
         .class("h-full")
 
-        .child(Sidebar::render_menu(&sidebar))
+        .child(Sidebar::render_menu(&sidebar, global_cols.clone()))
 
         .child_signal(Sidebar::render_panel(&sidebar, &workspace_command_tx))
 
-        .child_signal(Sidebar::render_vertical_resizer(&sidebar))
+        .child_signal(Sidebar::render_vertical_resizer(&sidebar, global_cols.clone()))
 
-        .children_signal_vec(Workspace::render_activity_panel(&workspace, workspace_width, activity_panel_height))
+        .child(Workspace::render_activity_panel(&workspace, workspace_width, activity_panel_height))
 
         .child(Workspace::render_horizontal_resizer(&workspace))
 
@@ -154,13 +160,6 @@ rclpy.shutdown()
 ";
 
 thread_local! {
-    pub static COLS: MutableVec<ColumnType> = MutableVec::new_with_values(vec![
-        ColumnType::Auto,
-        ColumnType::Auto,
-        ColumnType::Auto,
-        ColumnType::Fr
-    ]);
-
     pub static GLOBAL_LOG: Lazy<MutableVec<Arc<str>>> = Lazy::new(Default::default);
 
     pub static PROJECT: Lazy<Rc<vfs::Directory>> = Lazy::new(|| {
