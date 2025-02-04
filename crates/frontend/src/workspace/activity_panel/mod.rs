@@ -236,7 +236,6 @@ impl ActivityPanel {
 
         html!("div", {
             .class("col-span-1")
-            .class("row-span-1")
             .class("grid")
             .class("grid-rows-[auto_1fr]")
             .class("h-full")

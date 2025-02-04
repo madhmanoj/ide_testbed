@@ -39,7 +39,7 @@ impl Editor {
     ) -> impl Signal<Item = Option<dominator::Dom>> {
         stylesheet!(".cm-editor", {
             .style_signal("height", height.map(|height| format!("{height}px")))
-            .style_signal("width", width.map(|width| format!("{width}px")))
+            .style_signal("max-width", width.map(|width| format!("{width}px")))
             .style_important("outline", "none")
         });
         

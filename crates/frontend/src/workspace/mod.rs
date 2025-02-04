@@ -42,7 +42,6 @@ impl Default for Workspace {
             resizer_hover: Mutable::new(false),
             last_active_panel: Mutable::new(uuid),
             cols: MutableVec::new_with_values(vec![
-                ColumnType::Fr,
                 ColumnType::Fr
             ])
         }
@@ -61,16 +60,17 @@ impl Workspace {
         let height = height.broadcast();
 
         html!("div", {
-            // .style_signal("grid-template-columns", COLS.with(|cols| cols.signal_vec_cloned()
-            //     .map(|col_type| match col_type {
-            //         ColumnType::Auto => "auto".to_string(),
-            //         ColumnType::Fr => "1fr".to_string()
-            //     })
-            //     .to_signal_cloned()
-            //     .map(|columns| columns.join(" "))
-            // ))
             .class("col-span-1")
             .class("row-span-1")
+            .class("grid")
+            .style_signal("grid-template-columns", this.cols.signal_vec_cloned()
+                .map(|col_type| match col_type {
+                    ColumnType::Auto => "auto".to_string(),
+                    ColumnType::Fr => "1fr".to_string()
+                })
+                .to_signal_cloned()
+                .map(|columns| columns.join(" "))
+            )
             .children_signal_vec(this.activity_panel_list.entries_cloned().map(clone!(this, width, height => move |(_, panel)| {
                 ActivityPanel::render(&this, &panel, width.signal(), height.signal())
             })))
