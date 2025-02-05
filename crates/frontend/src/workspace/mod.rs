@@ -71,8 +71,8 @@ impl Workspace {
                 .to_signal_cloned()
                 .map(|columns| columns.join(" "))
             )
-            .children_signal_vec(this.activity_panel_list.entries_cloned().map(clone!(this, width, height => move |(_, panel)| {
-                ActivityPanel::render(&this, &panel, width.signal(), height.signal())
+            .children_signal_vec(this.activity_panel_list.entries_cloned().map(clone!(this, width, height => move |(uuid, panel)| {
+                ActivityPanel::render(&this, &panel, &uuid, width.signal(), height.signal())
             })))
         })
     }
@@ -139,4 +139,11 @@ impl Workspace {
             .child(this.console.render())
         })
     }
+}
+
+pub fn horizontal_resizer() -> Dom {
+    html!("div", {
+        .style("width", "3px")
+        .style("background-color", "blue")
+    })
 }

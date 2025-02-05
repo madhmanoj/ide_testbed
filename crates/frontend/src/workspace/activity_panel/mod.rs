@@ -3,7 +3,7 @@ use std::{pin::Pin, rc::Rc};
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions};
 use futures::{channel::mpsc::{self, UnboundedSender}, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
-
+use uuid::Uuid;
 use crate::{styles, vfs};
 use crate::contextmenu::TabMenu;
 use super::Workspace;
@@ -113,12 +113,10 @@ impl Activity {
             }))
             // rendering tab menu
             .child_signal(tab_menu.signal_ref(clone!(workspace, panel => move |menu_state| {
-                menu_state.as_ref().map(clone!(workspace, panel => move |menu| {
-                    if let Some(activity) = panel.active_activity.lock_ref().as_ref() {
+                menu_state.as_ref().and_then(clone!(workspace, panel => move |menu| {
+                    panel.active_activity.lock_ref().as_ref().map(|activity| {
                         TabMenu::render(menu, &workspace, activity)
-                    }  else {
-                        Dom::empty()
-                    }        
+                    })
                 }))
             })))
             // event handler for tab context menu
@@ -226,6 +224,7 @@ impl ActivityPanel {
     pub fn render(
         workspace: &Rc<Workspace>,
         this: &Rc<ActivityPanel>,
+        uuid: &Uuid,
         width: impl Signal<Item = u32> + 'static,
         height: impl Signal<Item = u32> + 'static
     ) -> dominator::Dom {
@@ -239,7 +238,24 @@ impl ActivityPanel {
             .class("grid")
             .class("grid-rows-[auto_1fr]")
             .class("h-full")
-
+            // future to remove empty activity panels, updating workspace layout, and resetting the last activity panel
+            // there might be a better way to implement this
+            .future(this.activities.signal_vec_cloned().len()
+                .for_each(clone!(workspace, uuid => move |count| clone!(workspace, uuid => async move {
+                    if count == 0 {
+                        workspace.activity_panel_list.lock_mut().remove(&uuid);
+                        workspace.cols.lock_mut().remove(0);
+                        if let Some((&first_uuid, _)) = workspace.activity_panel_list.lock_ref().iter().next() {
+                            workspace.last_active_panel.set(first_uuid);
+                        }
+                    }
+                })))
+            )
+            // event handler for swapping last active activity panel
+            .event(clone!(workspace, uuid => move |_: events::PointerDown| {
+                web_sys::console::log_1(&format!("{}", uuid).into());
+                workspace.last_active_panel.set(uuid);
+            }))
             // this takes up the full height but should only display when there are no activities
             // and hence no tab bar
             .child_signal(activity_count.signal().map(clone!(height => move |count| {
