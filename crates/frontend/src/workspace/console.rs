@@ -14,19 +14,19 @@ pub struct Console {}
 impl Console {
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
-            .apply(styles::default_layout)
+            .class("grid")
             .class("grid-rows-[auto_1fr]")
-            .class("m-0")
+            .class("h-full")
             .child(html!("div", {
-                .apply(styles::icon_text)
-                .class("p-3")
-                .class("m-0")
+                .apply(styles::console::title)
                 .child(html!("span", {
                     .apply(styles::console::title_text)
                     .text("Log messages")
                 }))
             }))
             .child(html!("div", {
+                .class("block")
+                .style("overflow-y", "scroll")
                 .apply(styles::console::message_area)
                 .children_signal_vec(crate::GLOBAL_LOG.with(|messages| messages
                     .signal_vec_cloned().map(render_entry)))
@@ -98,9 +98,9 @@ fn render_category(category: &str) -> Dom {
             "ERROR" => builder.text("error").class("bg-[#ff3860]"), // red
             _ => builder.text("unknown")
         })
-        .apply(styles::console::render_object)
         .class("uppercase")
         .style("min-width", "65px")
         .style("letter-spacing", ".1em")
+        .apply(styles::console::render_object)
     })
 }

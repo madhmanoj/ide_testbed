@@ -2,20 +2,17 @@ use dominator::DomBuilder;
 use futures_signals::signal::{self, Signal, SignalExt};
 use web_sys::HtmlElement;
 
-pub fn bar(dom: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
-    dom.class("inline-flex")
-        .class("h-[35px]")
+pub fn bar(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+    dom_builder
         .class("gap-0")
-        .class("bg-lightgray")
         .style("background-color", super::BACKGROUND_COLOR)
 }
 
-pub fn body(dom: DomBuilder<HtmlElement>,
+pub fn body(dom_builder: DomBuilder<HtmlElement>,
     is_active: impl Signal<Item = bool> + 'static,
     mouse_over: impl Signal<Item = bool> + 'static
 ) -> DomBuilder<HtmlElement> {
-    dom.class("block")
-        .class("h-full")
+    dom_builder
         .class("pt-1.5")
         .class("pl-1")
         .class("pr-2")
@@ -31,11 +28,11 @@ pub fn body(dom: DomBuilder<HtmlElement>,
 }
 
 pub fn icon(
-    dom: DomBuilder<HtmlElement>,
+    dom_builder: DomBuilder<HtmlElement>,
     mouse_over_close: impl Signal<Item = bool> + 'static,
     mouse_over: impl Signal<Item = bool> + 'static
 ) -> DomBuilder<HtmlElement> {
-    dom.apply(super::icon)
+    dom_builder
         .class_signal("invisible", signal::not(mouse_over))
         .style_signal("background-color", mouse_over_close.map(|flag| {
             if flag {
@@ -44,4 +41,5 @@ pub fn icon(
                 "transparent"
             }
         }))
+        .apply(super::icon)
 }

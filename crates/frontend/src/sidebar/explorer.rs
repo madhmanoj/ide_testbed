@@ -216,7 +216,7 @@ fn render_contents(
                     let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
                     if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                         workspace_command_tx
-                            .unbounded_send(crate::WorkspaceCommand::OpenFile(file.clone()))
+                            .unbounded_send(crate::WorkspaceCommand::OpenFile(None, file.clone()))
                             .unwrap()
                     }
                 }))
@@ -293,8 +293,10 @@ impl Explorer {
     pub fn render(this: &Rc<Explorer>, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
         let expanded = Mutable::new(true);
         html!("div", {
+            .class("block")
             .apply(styles::panel::body)
             .child(html!("div", {
+                .class("h-[35px]")
                 .apply(styles::panel::title)
                 .child(html!("span", {
                     .apply(styles::panel::title_text)
@@ -402,9 +404,15 @@ impl Explorer {
                     .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
                         event.prevent_default();
                     })
+                    // global event listener to close context menu if tab_menu is opened
+                    .global_event(clone!(this => move |event: events::MouseDown| {
+                        if event.button() == MouseButton::Right {
+                            this.context_menu.set(None)
+                        }
+                    }))
                     // global event listener to close context menu
-                    .global_event(clone!(this => move |_:events::Click| {
-                        this.context_menu.set(None)
+                    .global_event(clone!(this => move |_: events::Click| {
+                        this.context_menu.set(None);
                     }))
                     .child_signal(expanded.signal_ref(clone!(this, workspace_command_tx => move |expanded| {
                         expanded.then_some(render_contents(&this.workspace, &workspace_command_tx, this.context_menu.clone()))

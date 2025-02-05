@@ -1,8 +1,8 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
-use crate::sidebar::explorer::RENAME;
-use crate::styles;
-use crate::{vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
+use uuid::Uuid;
+use crate::workspace::{activity_panel::{ActivityPanel, Activity}, Workspace, ColumnType};
+use crate::{styles, vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE, sidebar::explorer::RENAME};
 #[derive(Clone)]
 pub enum Target {
     File(Rc<File>), 
@@ -24,56 +24,62 @@ impl ContextMenu {
         }
     }
 
-    // rendering context menu for folder
     pub fn folder_menu_render(
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-                .apply(|dom| styles::contextmenu::body(dom, &context_menu.position.0, &context_menu.position.1))
-                .children(&mut [
-                    html!("div", {
-                        .text("New Folder")
-                        .apply(styles::contextmenu::option)
-                        .event(clone!(context_menu => move |_event: events::MouseDown| {
-                            web_sys::console::log_1(&"New Folder Created".into());
-                            context_menu.add_folder();
-                        }))
-                    }), 
-                    html!("div", {
-                        .text("New File")
-                        .apply(styles::contextmenu::option)
-                        .event(clone!(context_menu => move |_event: events::MouseDown| {
-                            web_sys::console::log_1(&"New File Created".into());
-                            context_menu.add_file();
-                        }))
-                    }),
-                    html!("div", {
-                        .text("Rename Folder")
-                        .apply(styles::contextmenu::option)
-                        .event(clone!(context_menu => move |_event: events::MouseDown| {
-                            web_sys::console::log_1(&"Renaming Folder".into());
-                            if let Target::Directory(dir) = &context_menu.target  {
-                                RENAME.with(|rename| {
-                                    rename.set(Some(Target::Directory(dir.clone())));
-                                });
-                            }
-                        }))
-                    })
-                ])
-            })
+            .style("position", "absolute")
+            .style("z-index", "1000")
+            .style("width", "15rem")
+            .style("left", &format!("{}px", context_menu.position.0)) // X position
+            .style("top", &format!("{}px", context_menu.position.1))  // Y position
+            .apply(styles::contextmenu::body)
+            .children(&mut [
+                html!("div", {
+                    .text("New Folder")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
+                        context_menu.add_folder();
+                    }))
+                }), 
+                html!("div", {
+                    .text("New File")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
+                        context_menu.add_file();
+                    }))
+                }),
+                html!("div", {
+                    .text("Rename Folder")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
+                        web_sys::console::log_1(&"Hello bois".into());
+                        if let Target::Directory(dir) = &context_menu.target  {
+                            RENAME.with(|rename| {
+                                rename.set(Some(Target::Directory(dir.clone())));
+                            });
+                        }
+                    }))
+                })
+            ])
+        })
     }
     
     pub fn file_menu_render(
         context_menu: &ContextMenu
     ) -> Dom {
         html!("div", {
-            .apply(|dom| styles::contextmenu::body(dom, &context_menu.position.0, &context_menu.position.1))
+            .style("position", "absolute")
+            .style("z-index", "1000")
+            .style("width", "15rem")
+            .style("left", &format!("{}px", context_menu.position.0)) // X position
+            .style("top", &format!("{}px", context_menu.position.1))  // Y position
+            .apply(styles::contextmenu::body)
             .children(&mut [
                 html!("div", {
                     .text("Rename File")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_event: events::MouseDown| {
-                        web_sys::console::log_1(&"Renaming File".into());
+                    .event(clone!(context_menu => move |_: events::MouseDown| {
                         if let Target::File(file) = &context_menu.target  {
                             RENAME.with(|rename| {
                                 rename.set(Some(Target::File(file.clone())));
@@ -130,5 +136,56 @@ impl ContextMenu {
                 rename.set(Some(Target::File(new_file.clone())));
             });
         }
+    }
+}
+
+pub struct TabMenu {
+    // position of the tab context menu
+    pub position: (i32, i32)
+}
+
+impl TabMenu {
+    pub fn new(position: (i32, i32)) -> Self {
+        Self {
+            position
+        }
+    }
+
+    pub fn render(
+        tab_menu: &TabMenu,
+        workspace: &Rc<Workspace>,
+        activity: &Rc<Activity>
+    ) -> Dom {
+        html!("div", {
+            .style("position", "absolute")
+            .style("z-index", "1000")
+            .style("width", "15rem")
+            .style("left", &format!("{}px", tab_menu.position.0)) // X position
+            .style("top", &format!("{}px", tab_menu.position.1))  // Y position
+            .apply(styles::contextmenu::body)
+            .children(&mut [
+                html!("div", {
+                    .text("Split Right")
+                    .apply(styles::contextmenu::option)
+                    .event(clone!(workspace, activity => move |_: events::MouseDown| {
+                        TabMenu::split_panel(&workspace, &activity);
+                    }))
+                })
+            ])
+        })
+    }
+
+    pub fn split_panel(
+        workspace: &Rc<Workspace>,
+        activity: &Rc<Activity>
+    ) -> () {
+        let new_uuid = Uuid::new_v4();
+        let new_panel = ActivityPanel::new(activity);
+
+        workspace.cols.lock_mut().extend(vec![ColumnType::Fr]);
+
+        workspace.activity_panel_list.lock_mut().insert_cloned(new_uuid, new_panel);
+
+        workspace.last_active_panel.set(new_uuid);
     }
 }
