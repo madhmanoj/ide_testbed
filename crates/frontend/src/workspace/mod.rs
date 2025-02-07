@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, rc::Rc};
+use std::rc::Rc;
 
 use activity_panel::ActivityPanel;
 use dominator::{clone, events, html, Dom, EventOptions};
-use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_map::MutableBTreeMap, signal_vec::{MutableVec, SignalVecExt}};
+use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 use uuid::Uuid;
 use crate::styles;
 
@@ -19,7 +19,7 @@ pub enum ColumnType {
 }
 
 pub struct Workspace {
-    pub activity_panel_list: MutableBTreeMap<Uuid, Rc<activity_panel::ActivityPanel>>,
+    pub activity_panel_list: MutableVec<(Uuid, Rc<activity_panel::ActivityPanel>)>,
     console: Rc<console::Console>,
     pub console_height: Mutable<u32>,
     resize_active: Mutable<bool>,
@@ -33,9 +33,9 @@ impl Default for Workspace {
         let uuid = Uuid::new_v4();
 
         Self {
-            activity_panel_list: MutableBTreeMap::with_values(BTreeMap::from([
+            activity_panel_list: MutableVec::new_with_values(vec![
                 (uuid, ActivityPanel::default())
-            ])),
+            ]),
             console: Default::default(),
             console_height: Mutable::new(DEFAULT_CONSOLE_HEIGHT),
             resize_active: Mutable::new(false),
@@ -71,7 +71,7 @@ impl Workspace {
                 .to_signal_cloned()
                 .map(|columns| columns.join(" "))
             )
-            .children_signal_vec(this.activity_panel_list.entries_cloned().map(clone!(this, width, height => move |(uuid, panel)| {
+            .children_signal_vec(this.activity_panel_list.signal_vec_cloned().map(clone!(this, width, height => move |(uuid, panel)| {
                 ActivityPanel::render(&this, &panel, &uuid, width.signal(), height.signal())
             })))
         })

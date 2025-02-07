@@ -243,11 +243,9 @@ impl ActivityPanel {
             .future(this.activities.signal_vec_cloned().len()
                 .for_each(clone!(workspace, uuid => move |count| clone!(workspace, uuid => async move {
                     if count == 0 {
-                        workspace.activity_panel_list.lock_mut().remove(&uuid);
+                        workspace.activity_panel_list.lock_mut().retain(|(target_uuid, _)| *target_uuid != uuid);
                         workspace.cols.lock_mut().remove(0);
-                        if let Some((&first_uuid, _)) = workspace.activity_panel_list.lock_ref().iter().next() {
-                            workspace.last_active_panel.set(first_uuid);
-                        }
+                        workspace.last_active_panel.set(workspace.activity_panel_list.lock_ref().first().map(|(uuid, _)| *uuid).unwrap());
                     }
                 })))
             )

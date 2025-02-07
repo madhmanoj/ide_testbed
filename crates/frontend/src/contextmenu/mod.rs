@@ -184,7 +184,9 @@ impl TabMenu {
 
         workspace.cols.lock_mut().extend(vec![ColumnType::Fr]);
 
-        workspace.activity_panel_list.lock_mut().insert_cloned(new_uuid, new_panel);
+        let index = workspace.activity_panel_list.lock_ref().iter().position(|(uuid, _)| *uuid == workspace.last_active_panel.get()).unwrap();
+
+        workspace.activity_panel_list.lock_mut().insert_cloned(index + 1, (new_uuid, new_panel));
 
         workspace.last_active_panel.set(new_uuid);
     }

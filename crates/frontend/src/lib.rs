@@ -69,14 +69,16 @@ pub async fn main() {
         .future(workspace_command_rx.for_each(clone!(workspace => move |command| clone!(workspace => async move {
             match command {
                 WorkspaceCommand::OpenFile(maybe_uuid, file) => {
+                    let activity_panels = workspace.activity_panel_list.lock_mut();
+
                     if let Some(uuid) = maybe_uuid {
-                        if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&uuid) {
+                        if let Some((_, activity_panel)) = activity_panels.iter().find(|(id, _)| *id == uuid) {
                             activity_panel
                                 .activity_panel_tx
                                 .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
                                 .unwrap();
                         }
-                    } else if let Some(activity_panel) = workspace.activity_panel_list.lock_mut().get(&workspace.last_active_panel.lock_ref()) {
+                    } else if let Some((_, activity_panel)) = activity_panels.iter().find(|(id, _)| *id == workspace.last_active_panel.get()) {
                         activity_panel
                             .activity_panel_tx
                             .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
