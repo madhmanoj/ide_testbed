@@ -13,13 +13,19 @@ const DEFAULT_CONSOLE_HEIGHT: u32 = 200;
 const RESIZER_PX: u32 = 3;
 
 #[derive(Clone)]
+pub enum GridPanel {
+    Panel(Rc<ActivityPanel>),
+    Resizer
+}
+
+#[derive(Clone)]
 pub enum ColumnType {
     Auto,
     Fr
 }
 
 pub struct Workspace {
-    pub activity_panel_list: MutableVec<(Uuid, Rc<activity_panel::ActivityPanel>)>,
+    pub activity_panel_list: MutableVec<(Uuid, GridPanel)>,
     console: Rc<console::Console>,
     pub console_height: Mutable<u32>,
     resize_active: Mutable<bool>,
@@ -34,7 +40,7 @@ impl Default for Workspace {
 
         Self {
             activity_panel_list: MutableVec::new_with_values(vec![
-                (uuid, ActivityPanel::default())
+                (uuid, GridPanel::Panel(ActivityPanel::default()))
             ]),
             console: Default::default(),
             console_height: Mutable::new(DEFAULT_CONSOLE_HEIGHT),
@@ -72,7 +78,10 @@ impl Workspace {
                 .map(|columns| columns.join(" "))
             )
             .children_signal_vec(this.activity_panel_list.signal_vec_cloned().map(clone!(this, width, height => move |(uuid, panel)| {
-                ActivityPanel::render(&this, &panel, &uuid, width.signal(), height.signal())
+                match panel {
+                    GridPanel::Panel(panel) => ActivityPanel::render(&this, &panel, &uuid, width.signal(), height.signal()),
+                    GridPanel::Resizer => horizontal_resizer()
+                }
             })))
         })
     }

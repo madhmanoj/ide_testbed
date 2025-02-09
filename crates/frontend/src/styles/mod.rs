@@ -21,7 +21,7 @@ pub fn vertical_resizer(
     hover: impl Signal<Item = bool> + 'static
 ) -> DomBuilder<HtmlElement> {
     dom_builder
-        .class("min-h-screen")
+        .class("max-h-screen")
         .class("cursor-ew-resize")
         .apply(|dom| resizer(dom, active, hover))
 }

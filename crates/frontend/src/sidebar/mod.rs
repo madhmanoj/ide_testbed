@@ -148,6 +148,7 @@ impl Sidebar {
             panel.map(clone!(this, workspace_command_tx => move |panel| html!("div", {
                 .class("col-span-1")
                 .class("row-span-3")
+                .class("max-h-screen")
                 .class_signal("hidden", this.panel_size.signal().eq(0))
                 .style_signal("width", this.panel_size.signal_ref(|s| format!("{s}px")))
                 .child(panel.render(&workspace_command_tx))

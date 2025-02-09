@@ -7,7 +7,7 @@ use super::TITLE_COLOR as TOGGLE_INACTIVE_COLOR;
 
 pub fn body(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
     dom_builder
-        .class("min-h-screen")
+        .class("max-h-screen")
         .style("background-color", MENU_BACKGROUND_COLOR)
 }
 

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
 use uuid::Uuid;
-use crate::workspace::{activity_panel::{ActivityPanel, Activity}, Workspace, ColumnType};
+use crate::workspace::{activity_panel::{Activity, ActivityPanel}, ColumnType, GridPanel, Workspace};
 use crate::{styles, vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE, sidebar::explorer::RENAME};
 #[derive(Clone)]
 pub enum Target {
@@ -182,11 +182,18 @@ impl TabMenu {
         let new_uuid = Uuid::new_v4();
         let new_panel = ActivityPanel::new(activity);
 
-        workspace.cols.lock_mut().extend(vec![ColumnType::Fr]);
+        workspace.cols.lock_mut().extend(vec![ColumnType::Auto, ColumnType::Fr]);
 
-        let index = workspace.activity_panel_list.lock_ref().iter().position(|(uuid, _)| *uuid == workspace.last_active_panel.get()).unwrap();
+        let index = workspace.activity_panel_list.lock_ref()
+            .iter()
+            .position(|(uuid, panel)| 
+                *uuid == workspace.last_active_panel.get() && matches!(panel, GridPanel::Panel(_))
+            )
+            .unwrap();
+        web_sys::console::log_1(&format!("{}", index).into());
 
-        workspace.activity_panel_list.lock_mut().insert_cloned(index + 1, (new_uuid, new_panel));
+        workspace.activity_panel_list.lock_mut().insert_cloned(index + 1, (new_uuid, GridPanel::Resizer));
+        workspace.activity_panel_list.lock_mut().insert_cloned(index + 2, (new_uuid, GridPanel::Panel(new_panel)));
 
         workspace.last_active_panel.set(new_uuid);
     }

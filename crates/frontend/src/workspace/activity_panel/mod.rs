@@ -238,13 +238,20 @@ impl ActivityPanel {
             .class("grid")
             .class("grid-rows-[auto_1fr]")
             .class("h-full")
+
+            .class("overflow-x-scroll")
             // future to remove empty activity panels, updating workspace layout, and resetting the last activity panel
             // there might be a better way to implement this
             .future(this.activities.signal_vec_cloned().len()
                 .for_each(clone!(workspace, uuid => move |count| clone!(workspace, uuid => async move {
                     if count == 0 {
+                        // remove panel and associated resizer since they have the same uuid
                         workspace.activity_panel_list.lock_mut().retain(|(target_uuid, _)| *target_uuid != uuid);
+                        // remove one 1fr from grid template (for panel)
                         workspace.cols.lock_mut().remove(0);
+                        // remove one auto from grid template (for resizer)
+                        workspace.cols.lock_mut().remove(0);
+                        // set the last active panel as the first in the activity panel list
                         workspace.last_active_panel.set(workspace.activity_panel_list.lock_ref().first().map(|(uuid, _)| *uuid).unwrap());
                     }
                 })))
@@ -279,7 +286,7 @@ impl ActivityPanel {
                         .child_signal(Activity::render(
                             &activity,
                             width.signal(),
-                            height.signal_ref(|height| height.saturating_sub(TAB_HEIGHT))))
+                            height.signal_ref(|height| height.saturating_sub(TAB_HEIGHT + 17))))
                     })))
                 )
             )

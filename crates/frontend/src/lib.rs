@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
-use workspace::{activity_panel::ActivityPanelCommand, ColumnType};
+use workspace::{activity_panel::ActivityPanelCommand, ColumnType, GridPanel};
 
 mod sidebar;
 mod workspace;
@@ -72,13 +72,13 @@ pub async fn main() {
                     let activity_panels = workspace.activity_panel_list.lock_mut();
 
                     if let Some(uuid) = maybe_uuid {
-                        if let Some((_, activity_panel)) = activity_panels.iter().find(|(id, _)| *id == uuid) {
+                        if let Some((_, GridPanel::Panel(activity_panel))) = activity_panels.iter().find(|(id, _)| *id == uuid) {
                             activity_panel
                                 .activity_panel_tx
                                 .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
                                 .unwrap();
                         }
-                    } else if let Some((_, activity_panel)) = activity_panels.iter().find(|(id, _)| *id == workspace.last_active_panel.get()) {
+                    } else if let Some((_, GridPanel::Panel(activity_panel))) = activity_panels.iter().find(|(id, _)| *id == workspace.last_active_panel.get()) {
                         activity_panel
                             .activity_panel_tx
                             .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
@@ -97,7 +97,6 @@ pub async fn main() {
             .map(|columns| columns.join(" "))
         )
         .class("grid-rows-[1fr_auto_auto]")
-        .class("h-full")
 
         .child(Sidebar::render_menu(&sidebar, global_cols.clone()))
 
