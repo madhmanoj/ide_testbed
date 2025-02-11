@@ -67,7 +67,7 @@ impl Workspace {
 
         html!("div", {
             .class("col-span-1")
-            .class("row-span-1")
+            .class("row-span-1")    
             .class("grid")
             .style_signal("grid-template-columns", this.cols.signal_vec_cloned()
                 .map(|col_type| match col_type {
@@ -80,7 +80,7 @@ impl Workspace {
             .children_signal_vec(this.activity_panel_list.signal_vec_cloned().map(clone!(this, width, height => move |(uuid, panel)| {
                 match panel {
                     GridPanel::Panel(panel) => ActivityPanel::render(&this, &panel, &uuid, width.signal(), height.signal()),
-                    GridPanel::Resizer => horizontal_resizer()
+                    GridPanel::Resizer => horizontal_resizer(&uuid)
                 }
             })))
         })
@@ -150,9 +150,28 @@ impl Workspace {
     }
 }
 
-pub fn horizontal_resizer() -> Dom {
+pub fn horizontal_resizer(
+    uuid: &Uuid
+) -> Dom {
+    let resize_active = Mutable::new(false);
+    let resizer_hover = Mutable::new(false);
+
     html!("div", {
+        .class("cursor-ew-resize")
         .style("width", "3px")
-        .style("background-color", "blue")
+        .apply(|dom| styles::vertical_resizer(dom, resize_active.signal(), resizer_hover.signal()))
+        .event_with_options(&EventOptions::preventable(), clone!(resize_active => move |ev: events::PointerDown| {
+            resize_active.set_neq(true);
+            ev.prevent_default();
+        }))
+        .global_event(clone!(resize_active => move |_: events::PointerUp| {
+            resize_active.set_neq(false);
+        }))
+        .event(clone!(resizer_hover => move |_: events::PointerEnter| {
+            resizer_hover.set_neq(true);
+        }))
+        .event(clone!(resizer_hover => move |_: events::PointerLeave| {
+            resizer_hover.set_neq(false);
+        }))
     })
 }
