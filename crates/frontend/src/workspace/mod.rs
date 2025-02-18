@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use activity_panel::ActivityPanel;
 use dominator::{clone, events, html, Dom, EventOptions};
-use futures_signals::{map_ref, signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
+use futures_signals::{map_ref, signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt, VecDiff}};
 use uuid::Uuid;
 use crate::styles;
 
@@ -79,7 +79,7 @@ impl Workspace {
         };
 
         // to set the widths of new panels 
-        let temp = Mutable::new(0 as i32);
+        let full_width = Mutable::new(0 as i32);
 
         html!("div", {
             .class("col-span-1")
@@ -87,12 +87,28 @@ impl Workspace {
             .class("grid")
             // future to track changes in width of individual panels based on changes in window or dropping panels
             // ISSUE: it automatically resizes everytime you drop a panel or resize the window
-            .future(full_width_signal.for_each(clone!(panel_widths, temp => move |full_width| clone!(panel_widths, temp => async move {
-                temp.set(full_width as i32);
+            .future(full_width_signal.for_each(clone!(panel_widths, full_width => move |full_width_value| clone!(panel_widths, full_width => async move {
+                full_width.set(full_width_value as i32);
                 for i in panel_widths.lock_mut().iter() {
-                    i.set(full_width as i32);
+                    i.set(full_width_value as i32);
                 }
             }))))
+            // future to handle removing widths of removed panels
+            .future(this.activity_panel_list.signal_vec_cloned().for_each(clone!(panel_widths => move |change| {
+                let mut panel_width_lock = panel_widths.lock_mut();
+
+                match change {
+                    VecDiff::RemoveAt { index } => {
+                        let true_index = index / 2;
+                        if index % 2 == 0 {
+                            web_sys::console::log_1(&format!("Removing width at index: {}", true_index).into());
+                            panel_width_lock.remove(true_index);
+                        }
+                    }
+                    _ => {}
+                }
+                async {}
+            })))
             .style("overflow", "hidden")
             .style_signal("width", width.signal().map(|width| format!("{}px", width)))
             .style_signal("height", height.signal().map(|height| format!("{}px", height)))
@@ -109,7 +125,7 @@ impl Workspace {
                 match panel {
                     GridPanel::Panel(panel) => {
                         let index = index / 2;
-                        let w = Mutable::new(temp.get());
+                        let w = Mutable::new(full_width.get());
                         panel_widths.lock_mut().insert_cloned(index, w.clone());
                         ActivityPanel::render(&this, &panel, &uuid, w.clone(), width.signal(), height.signal())
                     },
