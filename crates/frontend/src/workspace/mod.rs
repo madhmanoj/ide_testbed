@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use activity_panel::ActivityPanel;
 use dominator::{clone, events, html, Dom, EventOptions};
-use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
+use futures_signals::{map_ref, signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
 use uuid::Uuid;
 use crate::styles;
 
@@ -65,22 +65,57 @@ impl Workspace {
         let width = width.broadcast();
         let height = height.broadcast();
 
+        // vector to hold the widths of panels
+        let panel_widths: MutableVec<Mutable<i32>> = MutableVec::new();
+
+        // to track changes in the width of window and number of activity panels so that panels are split widthwise equally
+        let full_width_signal = map_ref! {
+            let total_width = width.signal(),
+            let num_panels = this.activity_panel_list.signal_vec_cloned().len() => {
+                let num_panels = *num_panels as u32;
+                let total_width = total_width - (((num_panels - 1) / 2) * 3);
+                total_width / ((num_panels + 1) / 2)
+            }
+        };
+
+        // to set the widths of new panels 
+        let temp = Mutable::new(0 as i32);
+
         html!("div", {
             .class("col-span-1")
-            .class("row-span-1")    
+            .class("row-span-1")  
             .class("grid")
+            // future to track changes in width of individual panels based on changes in window or dropping panels
+            // ISSUE: it automatically resizes everytime you drop a panel or resize the window
+            .future(full_width_signal.for_each(clone!(panel_widths, temp => move |full_width| clone!(panel_widths, temp => async move {
+                temp.set(full_width as i32);
+                for i in panel_widths.lock_mut().iter() {
+                    i.set(full_width as i32);
+                }
+            }))))
+            .style("overflow", "hidden")
+            .style_signal("width", width.signal().map(|width| format!("{}px", width)))
+            .style_signal("height", height.signal().map(|height| format!("{}px", height)))
             .style_signal("grid-template-columns", this.cols.signal_vec_cloned()
                 .map(|col_type| match col_type {
-                    ColumnType::Auto => "auto".to_string(),
+                    ColumnType::Auto => "3px".to_string(),
                     ColumnType::Fr => "1fr".to_string()
                 })
                 .to_signal_cloned()
                 .map(|columns| columns.join(" "))
             )
-            .children_signal_vec(this.activity_panel_list.signal_vec_cloned().map(clone!(this, width, height => move |(uuid, panel)| {
+            .children_signal_vec(this.activity_panel_list.signal_vec_cloned().enumerate().map(clone!(this, width, height => move |(index, (uuid, panel))| {
+                let index = index.get().unwrap();
                 match panel {
-                    GridPanel::Panel(panel) => ActivityPanel::render(&this, &panel, &uuid, width.signal(), height.signal()),
-                    GridPanel::Resizer => horizontal_resizer(&uuid)
+                    GridPanel::Panel(panel) => {
+                        let index = index / 2;
+                        let w = Mutable::new(temp.get());
+                        panel_widths.lock_mut().insert_cloned(index, w.clone());
+                        ActivityPanel::render(&this, &panel, &uuid, w.clone(), width.signal(), height.signal())
+                    },
+                    GridPanel::Resizer => {
+                        horizontal_resizer(&this, &uuid, panel_widths.clone())   
+                    }
                 }
             })))
         })
@@ -151,18 +186,22 @@ impl Workspace {
 }
 
 pub fn horizontal_resizer(
-    uuid: &Uuid
+    workspace: &Rc<Workspace>,
+    uuid: &Uuid,
+    panel_widths: MutableVec<Mutable<i32>>
 ) -> Dom {
     let resize_active = Mutable::new(false);
     let resizer_hover = Mutable::new(false);
+    let initial_position = Mutable::new(0 as i32);
 
     html!("div", {
         .class("cursor-ew-resize")
-        .style("width", "3px")
         .apply(|dom| styles::vertical_resizer(dom, resize_active.signal(), resizer_hover.signal()))
-        .event_with_options(&EventOptions::preventable(), clone!(resize_active => move |ev: events::PointerDown| {
+        .event_with_options(&EventOptions::preventable(), clone!(resize_active, initial_position, uuid => move |event: events::PointerDown| {
+            web_sys::console::log_1(&format!("{uuid}").into());
+            initial_position.set(event.x());
             resize_active.set_neq(true);
-            ev.prevent_default();
+            event.prevent_default();
         }))
         .global_event(clone!(resize_active => move |_: events::PointerUp| {
             resize_active.set_neq(false);
@@ -172,6 +211,47 @@ pub fn horizontal_resizer(
         }))
         .event(clone!(resizer_hover => move |_: events::PointerLeave| {
             resizer_hover.set_neq(false);
+        }))
+        .global_event(clone!(resize_active, initial_position, panel_widths, workspace, uuid => move |event:events::PointerMove| {
+            if resize_active.get() {
+                let index = workspace.activity_panel_list
+                    .lock_ref()
+                    .iter()
+                    .position(|(target_uuid, panel)| matches!(panel, GridPanel::Resizer) && *target_uuid == uuid)
+                    .unwrap();
+
+                let left_index = (index - 1) / 2; // Get left panel index
+                let right_index = left_index + 1; // Ensure correct right panel index
+
+                let panel_width_lock = panel_widths.lock_ref();
+                
+                let left_panel_width = panel_width_lock.get(left_index).unwrap();
+                let right_panel_width = panel_width_lock.get(right_index).unwrap();
+
+                let offset = event.x() - initial_position.get();
+
+                // hack to prevent the panel from not allowing resizing when it reaches min width (100px)
+                if left_panel_width.get() <= 100 {
+                    let relative_offset = (100 - left_panel_width.get()) + 1;
+                    left_panel_width.set(left_panel_width.get() + relative_offset);
+                    right_panel_width.set(right_panel_width.get() - relative_offset);
+                }
+
+                // hack to prevent the panel from not allowing resizing when it reaches min width (100px)
+                if right_panel_width.get() <= 100 {
+                    let relative_offset = (100 - right_panel_width.get()) + 1;
+                    right_panel_width.set(right_panel_width.get() + relative_offset);
+                    left_panel_width.set(left_panel_width.get() - relative_offset);
+                }
+
+                // main resizing logic
+                if offset != 0 && left_panel_width.get() > 100 && right_panel_width.get() > 100 {
+                    left_panel_width.set(left_panel_width.get() + offset);
+                    right_panel_width.set(right_panel_width.get() - offset);
+
+                    initial_position.set(event.x());
+                }
+            }
         }))
     })
 }

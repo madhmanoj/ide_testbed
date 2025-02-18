@@ -16,24 +16,24 @@ impl Welcome {
 
     pub fn render(
         _this: &Rc<Welcome>,
-        width: impl Signal<Item = u32> + 'static,
-        height: impl Signal<Item = u32> + 'static
+        // width: impl Signal<Item = u32> + 'static,
+        // height: impl Signal<Item = u32> + 'static
     ) -> impl Signal<Item = Option<Dom>> {
-        let content_max_width = width
-            .map(|width| (((width as f32) * 0.8) as u32).min(MAX_CONTENT_WIDTH))
-            .broadcast();
+        // let content_max_width = width
+        //     .map(|width| (((width as f32) * 0.8) as u32).min(MAX_CONTENT_WIDTH))
+        //     .broadcast();
       
         let dom = html!("div", {
             .class("gap-0")
             .class("place-items-center")
             .style("overflow-y", "scroll")
-            .style_signal("height", height.map(|height| format!("{height}px")))
+            // .style_signal("height", height.map(|height| format!("{height}px")))
             .child(html!("div", {
                 .class("block")
                 .class("h-full")
                 .class("py-6")
                 .class("place-content-center")
-                .style_signal("max-width", content_max_width.signal_ref(|width| format!("{width}px")))
+                // .style_signal("max-width", content_max_width.signal_ref(|width| format!("{width}px")))
                 .child(html!("h1", {
                     .class("mb-[0.5em]")
                     .class("text-[2em]")

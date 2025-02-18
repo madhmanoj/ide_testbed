@@ -25,12 +25,12 @@ pub enum Activity {
 impl Activity {
     pub fn render(
         this: &Rc<Activity>,
-        width: impl Signal<Item = u32> + 'static,
-        height: impl Signal<Item = u32> + 'static
+        // width: impl Signal<Item = u32> + 'static,
+        // height: impl Signal<Item = u32> + 'static
     ) -> Pin<Box<dyn Signal<Item = Option<dominator::Dom>>>> {
         match this.as_ref() {
-            Activity::Editor(editor) => Box::pin(editor::Editor::render(editor, width, height)),
-            Activity::Welcome(welcome) => Box::pin(welcome::Welcome::render(welcome, width, height)),
+            Activity::Editor(editor) => Box::pin(editor::Editor::render(editor)),
+            Activity::Welcome(welcome) => Box::pin(welcome::Welcome::render(welcome)),
         }
     }
 
@@ -225,21 +225,23 @@ impl ActivityPanel {
         workspace: &Rc<Workspace>,
         this: &Rc<ActivityPanel>,
         uuid: &Uuid,
-        width: impl Signal<Item = u32> + 'static,
-        height: impl Signal<Item = u32> + 'static
+        width: Mutable<i32>,
+        max_width: impl Signal<Item = u32> + 'static,
+        max_height: impl Signal<Item = u32> + 'static
     ) -> dominator::Dom {
 
         let activity_count = this.activities.signal_vec_cloned().len().broadcast();
-        let width = width.broadcast();
-        let height = height.broadcast();
+        let max_width = max_width.broadcast();
+        let max_height = max_height.broadcast();
 
         html!("div", {
             .class("col-span-1")
             .class("grid")
             .class("grid-rows-[auto_1fr]")
-            .class("h-full")
-
             .class("overflow-x-scroll")
+            .style_signal("max-height", max_height.signal().map(|max_height| format!("{}px", max_height)))
+            .style_signal("max-width", max_width.signal().map(|max_width| format!("{}px", max_width)))
+            .style_signal("width", width.signal().map(|width| format!("{}px", width)))
             // future to remove empty activity panels, updating workspace layout, and resetting the last activity panel
             // there might be a better way to implement this
             .future(this.activities.signal_vec_cloned().len()
@@ -263,8 +265,8 @@ impl ActivityPanel {
             }))
             // this takes up the full height but should only display when there are no activities
             // and hence no tab bar
-            .child_signal(activity_count.signal().map(clone!(height => move |count| {
-                (count == 0).then(|| Self::render_background(height.signal()))
+            .child_signal(activity_count.signal().map(clone!(max_height => move |count| {
+                (count == 0).then(|| Self::render_background(max_height.signal()))
             })))
             // tabs take up one full line
             .child(html!("div", {
@@ -281,13 +283,14 @@ impl ActivityPanel {
             .child_signal(this.active_activity
                 .signal_cloned()
                 .map(move |activity: Option<Rc<Activity>>| activity
-                    .map(clone!(width, height => move |activity| html!("div", {
+                    .map(|activity| html!("div", {
                         .class("h-full")
                         .child_signal(Activity::render(
                             &activity,
-                            width.signal(),
-                            height.signal_ref(|height| height.saturating_sub(TAB_HEIGHT + 17))))
-                    })))
+                            // width.signal(),
+                            // height.signal_ref(|height| height.saturating_sub(TAB_HEIGHT + 17))
+                        ))
+                    }))
                 )
             )
         })
