@@ -230,6 +230,9 @@ pub fn horizontal_resizer(
         }))
         .global_event(clone!(resize_active, initial_position, panel_widths, workspace, uuid => move |event:events::PointerMove| {
             if resize_active.get() {
+                // hardcoded min width for any given activity panel
+                let min_panel_width = 250;
+
                 let index = workspace.activity_panel_list
                     .lock_ref()
                     .iter()
@@ -246,26 +249,24 @@ pub fn horizontal_resizer(
 
                 let offset = event.x() - initial_position.get();
 
-                // hack to prevent the panel from not allowing resizing when it reaches min width (100px)
-                if left_panel_width.get() <= 100 {
-                    let relative_offset = (100 - left_panel_width.get()) + 1;
-                    left_panel_width.set(left_panel_width.get() + relative_offset);
-                    right_panel_width.set(right_panel_width.get() - relative_offset);
-                }
+                let new_left_width = left_panel_width.get() + offset;
+                let new_right_width = right_panel_width.get() - offset;
 
-                // hack to prevent the panel from not allowing resizing when it reaches min width (100px)
-                if right_panel_width.get() <= 100 {
-                    let relative_offset = (100 - right_panel_width.get()) + 1;
-                    right_panel_width.set(right_panel_width.get() + relative_offset);
-                    left_panel_width.set(left_panel_width.get() - relative_offset);
-                }
-
-                // main resizing logic
-                if offset != 0 && left_panel_width.get() > 100 && right_panel_width.get() > 100 {
-                    left_panel_width.set(left_panel_width.get() + offset);
-                    right_panel_width.set(right_panel_width.get() - offset);
-
+                // Ensure the panels do not shrink below min width
+                if new_left_width >= min_panel_width && new_right_width >= min_panel_width {
+                    left_panel_width.set(new_left_width);
+                    right_panel_width.set(new_right_width);
                     initial_position.set(event.x());
+                } else if new_left_width < min_panel_width {
+                    // Prevent left panel from shrinking too much
+                    let max_offset = min_panel_width - left_panel_width.get();
+                    left_panel_width.set(min_panel_width);
+                    right_panel_width.set(right_panel_width.get() - max_offset);
+                } else if new_right_width < min_panel_width {
+                    // Prevent right panel from shrinking too much
+                    let max_offset = min_panel_width - right_panel_width.get();
+                    right_panel_width.set(min_panel_width);
+                    left_panel_width.set(left_panel_width.get() - max_offset);
                 }
             }
         }))
