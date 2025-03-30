@@ -562,13 +562,13 @@ impl LayoutPanel {
                         let new_activity_panel = ActivityPanel::new(&active_activity);
 
                         if split_up {
-                            let split_horizontal = Rc::new(LayoutPanel::HorizontalSplit { parent: Some(parent.clone()), children: MutableVec::default() });
+                            let split_horizontal = Rc::new(LayoutPanel::VerticalSplit { parent: Some(parent.clone()), children: MutableVec::default() });
                             split_horizontal.append_widget(100.0, new_activity_panel.clone());
                             split_horizontal.append_widget(100.0, activity_panel.clone());
 
                             lock.set_cloned(index, (split_horizontal, Mutable::new(old_size)));
                         } else {
-                            let split_horizontal = Rc::new(LayoutPanel::HorizontalSplit { parent: Some(parent.clone()), children: MutableVec::default() });
+                            let split_horizontal = Rc::new(LayoutPanel::VerticalSplit { parent: Some(parent.clone()), children: MutableVec::default() });
                             split_horizontal.append_widget(100.0, activity_panel.clone());
                             split_horizontal.append_widget(100.0, new_activity_panel.clone());
 
