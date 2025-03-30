@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
-use uuid::Uuid;
-use crate::workspace::{activity_panel::{Activity, ActivityPanel}, ColumnType, GridPanel, Workspace};
+use crate::workspace::panel::LayoutPanel;
+use crate::workspace::activity_panel::{Activity, ActivityPanel};
 use crate::{styles, vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE, sidebar::explorer::RENAME};
 #[derive(Clone)]
 pub enum Target {
@@ -94,7 +94,7 @@ impl ContextMenu {
     // to add folder under a folder
     pub fn add_folder(
         &self
-    ) -> () {
+    ) {
         // initialise a new directory
         let new_directory = Rc::new(
             Directory {
@@ -118,7 +118,7 @@ impl ContextMenu {
     // to add file under a folder
     pub fn add_file(
         &self
-    ) -> () {
+    ) {
         // initialise a new file
         let new_file = Rc::new(
             File {
@@ -140,61 +140,167 @@ impl ContextMenu {
 }
 
 pub struct TabMenu {
-    // position of the tab context menu
-    pub position: (i32, i32)
+    pub position: (i32, i32),
+    pub panel: Rc<LayoutPanel>
 }
 
 impl TabMenu {
-    pub fn new(position: (i32, i32)) -> Self {
-        Self {
-            position
-        }
-    }
-
     pub fn render(
-        tab_menu: &TabMenu,
-        workspace: &Rc<Workspace>,
-        activity: &Rc<Activity>
+        &self
     ) -> Dom {
+        let TabMenu { position, panel } = self;
+        let show_close = if let LayoutPanel::Widget { parent: Some(parent), .. } = panel.as_ref() {
+            match parent.as_ref() {
+                LayoutPanel::HorizontalSplit { children, parent: grand_parent } 
+                | LayoutPanel::VerticalSplit { children, parent: grand_parent } => {
+                    children.lock_ref().len() == 1 && grand_parent.is_none()
+                },
+                _ => false
+            }
+        } else {
+            false
+        };
         html!("div", {
+            .style("left", format!("{}px", position.0))
+            .style("top", format!("{}px", position.1))
+            .style("gap", "2px")
             .style("position", "absolute")
-            .style("z-index", "1000")
-            .style("width", "15rem")
-            .style("left", &format!("{}px", tab_menu.position.0)) // X position
-            .style("top", &format!("{}px", tab_menu.position.1))  // Y position
+            .style("width", "10rem")
+            .style("z-index", dominator::HIGHEST_ZINDEX)
+            .style("background-color", "lightblue")
             .apply(styles::contextmenu::body)
-            .children(&mut [
-                html!("div", {
-                    .text("Split Right")
-                    .apply(styles::contextmenu::option)
-                    .event(clone!(workspace, activity => move |_: events::MouseDown| {
-                        TabMenu::split_panel(&workspace, &activity);
-                    }))
-                })
-            ])
+            // .child(
+            //     html!("div", {
+            //         .apply_if(!show_close, |dom| 
+            //             dom
+            //                 .text("Close")
+            //                 .class("cursor-pointer")
+            //                 .event(clone!(panel => move |_:events::MouseDown| {
+            //                     if let Panel::Widget { parent: Some(parent), .. } = panel.as_ref() {
+            //                         match parent.as_ref() {
+            //                             Panel::HorizontalSplit { children, parent: grand_parent } | Panel::VerticalSplit { children, parent: grand_parent } => {
+            //                                 // index should always be a Some value, since self should always be present in children mutablevec of its parent
+            //                                 // otherwise panic since the panel is invalid
+            //                                 let mut parent_children = children.lock_mut();
+            //                                 let index = parent_children.iter().position(|(child, _)| {
+            //                                     Rc::ptr_eq(child, &panel)
+            //                                 }).unwrap();
+                                            
+            //                                 web_sys::console::log_1(&format!("{index}").into());
+            //                                 // remove widget
+            //                                 parent_children.remove(index);
+
+            //                                 // check if parent has only one child left, if yes, clean up the panel layout
+            //                                 if parent_children.len() == 1 {
+            //                                     // there is only 1 element according to the if condition
+            //                                     let (only_child, _) = parent_children.first().unwrap();
+
+            //                                     match only_child.as_ref() {
+            //                                         // for cases where the only child is a split, the logic is to promote all the panels of the child to the mutablevec 
+            //                                         // of the panel's parent
+            //                                         // this makes sense because in the nesting structure according to our implementation, there can only ever be a 
+            //                                         // horizontal split inside a vertical split and vice versa, and if we directly promote the split panel, we will have a 
+            //                                         // vertical split inside a vertical split (similarly for horizontal split) which is redundant
+            //                                         Panel::HorizontalSplit { children: only_child_children, .. }
+            //                                         | Panel::VerticalSplit { children: only_child_children, .. } => {
+            //                                             if let Some(grand_parent) = grand_parent {
+            //                                                 match grand_parent.as_ref() {
+            //                                                     Panel::HorizontalSplit { children: grand_parent_children, .. }
+            //                                                     | Panel::VerticalSplit { children: grand_parent_children, .. } => {
+            //                                                         let mut grand_parent_children = grand_parent_children.lock_mut();
+            //                                                         if let Some(index) = grand_parent_children.iter().position(|(child, _)| Rc::ptr_eq(child, parent)) {
+            //                                                             for (i, (panel, size)) in only_child_children.lock_ref().iter().enumerate() {
+            //                                                                 let new_child = match panel.as_ref() {
+            //                                                                     Panel::HorizontalSplit { children, .. } => Rc::new(Panel::HorizontalSplit { 
+            //                                                                         parent: Some(grand_parent.clone()), 
+            //                                                                         children: children.clone() 
+            //                                                                     }),
+            //                                                                     Panel::VerticalSplit { children, .. } => Rc::new(Panel::VerticalSplit { 
+            //                                                                         parent: Some(grand_parent.clone()), 
+            //                                                                         children: children.clone()
+            //                                                                     }),
+            //                                                                     Panel::Widget { color, .. } => Rc::new(Panel::Widget { 
+            //                                                                         parent: Some(grand_parent.clone()), 
+            //                                                                         color 
+            //                                                                     })
+            //                                                                 };
+            //                                                                 let size = size.get();
+            //                                                                 if i == 0 {
+            //                                                                     grand_parent_children.set_cloned(index + i, (new_child.clone(), Mutable::new(size)));
+            //                                                                 } else {
+            //                                                                     grand_parent_children.insert_cloned(index + i, (new_child.clone(), Mutable::new(size)));
+            //                                                                 }
+            //                                                             }
+            //                                                         }
+            //                                                     },
+            //                                                     _ => {}
+            //                                                 }
+            //                                             }  
+            //                                         },
+            //                                         // for cases where only_child is a widget, promote widget to the grand_parent directly if its the only panel left in the parent after removal of the original widget
+            //                                         Panel::Widget { color, .. } => {
+            //                                             let new_widget = Rc::new(Panel::Widget { 
+            //                                                 parent: grand_parent.clone(), 
+            //                                                 color 
+            //                                             });
+
+            //                                             if let Some(grand_parent) = grand_parent {
+            //                                                 match grand_parent.as_ref() {
+            //                                                     Panel::HorizontalSplit { children: grand_parent_children, .. } 
+            //                                                     | Panel::VerticalSplit { children: grand_parent_children, .. } => {
+            //                                                         let mut grand_parent_children = grand_parent_children.lock_mut();
+            //                                                         if let Some(index) = grand_parent_children.iter().position(|(child, _)| Rc::ptr_eq(child, parent)) {
+            //                                                             let size = grand_parent_children[index].1.get();
+            //                                                             grand_parent_children.set_cloned(index, (new_widget, Mutable::new(size)));
+            //                                                         }
+            //                                                     },
+            //                                                     _ => {}
+            //                                                 }
+            //                                             }
+            //                                         },
+            //                                     }
+
+            //                                 }
+            //                             },
+            //                             _ => {}
+            //                         }
+            //                     }
+            //                 }))
+            //         )
+            //     })
+            // )
+            .child(html!("div", {
+                .text("Split Right")
+                .class("cursor-pointer")
+                .apply(styles::contextmenu::option)
+                .event(clone!(panel => move |_: events::MouseDown| {
+                    panel.split_horizontal(false);
+                }))
+            }))
+            .child(html!("div", {
+                .text("Split Left")
+                .class("cursor-pointer")
+                .apply(styles::contextmenu::option)
+                .event(clone!(panel => move |_: events::MouseDown| {
+                    panel.split_horizontal(true);
+                }))
+            }))
+            .child(html!("div", {
+                .text("Split Up")
+                .class("cursor-pointer")
+                .apply(styles::contextmenu::option)
+                .event(clone!(panel => move |_: events::MouseDown| {
+                    panel.split_vertical(true);
+                }))
+            }))
+            .child(html!("div", {
+                .text("Split Down")
+                .class("cursor-pointer")
+                .apply(styles::contextmenu::option)
+                .event(clone!(panel => move |_: events::MouseDown| {
+                    panel.split_vertical(false);
+                }))
+            }))
         })
-    }
-
-    pub fn split_panel(
-        workspace: &Rc<Workspace>,
-        activity: &Rc<Activity>
-    ) -> () {
-        let new_uuid = Uuid::new_v4();
-        let new_panel = ActivityPanel::new(activity);
-
-        workspace.cols.lock_mut().extend(vec![ColumnType::Auto, ColumnType::Fr]);
-
-        let index = workspace.activity_panel_list.lock_ref()
-            .iter()
-            .position(|(uuid, panel)| 
-                *uuid == workspace.last_active_panel.get() && matches!(panel, GridPanel::Panel(_))
-            )
-            .unwrap();
-        web_sys::console::log_1(&format!("{}", index).into());
-
-        workspace.activity_panel_list.lock_mut().insert_cloned(index + 1, (new_uuid, GridPanel::Resizer));
-        workspace.activity_panel_list.lock_mut().insert_cloned(index + 2, (new_uuid, GridPanel::Panel(new_panel)));
-
-        workspace.last_active_panel.set(new_uuid);
     }
 }

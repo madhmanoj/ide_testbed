@@ -9,22 +9,11 @@ pub mod console;
 pub mod contextmenu;
 pub mod vfs_item;
 
-const BACKGROUND_COLOR: &str = "#f3f3f3"; // lightgray
-const FEATURE_COLOR: &str = "#007acc"; // blue
+pub const BACKGROUND_COLOR: &str = "#f3f3f3"; // lightgray
+pub const FEATURE_COLOR: &str = "#007acc"; // blue
 const FOREGROUND_COLOR: &str = "#ffffff"; // TOGGLE_ACTIVE_COLOR -- white
 const TITLE_COLOR: &str = "#828282"; // TOGGLE_INACTIVE_COLOR -- darkgray
 const TEXT_COLOR: &str = "#2c2c2c"; // mineshaft
-
-pub fn vertical_resizer(
-    dom_builder: DomBuilder<HtmlElement>,
-    active: impl Signal<Item = bool> + 'static,
-    hover: impl Signal<Item = bool> + 'static
-) -> DomBuilder<HtmlElement> {
-    dom_builder
-        .class("max-h-screen")
-        .class("cursor-ew-resize")
-        .apply(|dom| resizer(dom, active, hover))
-}
 
 pub fn welcome_icon(dom_builder: DomBuilder<SvgElement>) -> DomBuilder<SvgElement> {
     dom_builder

@@ -5,9 +5,8 @@ use futures::{channel::mpsc, StreamExt};
 use futures_signals::{map_ref, signal::SignalExt, signal_vec::{MutableVec, SignalVecExt}};
 use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
-use uuid::Uuid;
 use wasm_bindgen::prelude::*;
-use workspace::{activity_panel::ActivityPanelCommand, ColumnType, GridPanel};
+use workspace::activity_panel::{ActivityPanel, ActivityPanelCommand};
 
 mod sidebar;
 mod workspace;
@@ -17,8 +16,21 @@ mod styles;
 
 const RESIZER_PX: u32 = 3;
 
+
+#[derive(Clone)]
+pub enum GridPanel {
+    Panel(Rc<ActivityPanel>),
+    Resizer
+}
+
+#[derive(Clone)]
+pub enum ColumnType {
+    Auto,
+    Fr
+}
+
 enum WorkspaceCommand {
-    OpenFile(Option<Uuid>, Rc<vfs::File>),
+    OpenFile(Rc<vfs::File>),
 }
 type WorkspaceCommandSender = mpsc::UnboundedSender<WorkspaceCommand>;
 // type WorkspaceCommandReceiver = mpsc::UnboundedReceiver<WorkspaceCommand>;
@@ -65,24 +77,16 @@ pub async fn main() {
     ]);
 
     let outer = html!("div", {
-
         .future(workspace_command_rx.for_each(clone!(workspace => move |command| clone!(workspace => async move {
             match command {
-                WorkspaceCommand::OpenFile(maybe_uuid, file) => {
-                    let activity_panels = workspace.activity_panel_list.lock_mut();
+                WorkspaceCommand::OpenFile(file) => {
+                    let activity_panel = workspace.active_panel.get_cloned();
+                    let activity_panel_tx = activity_panel.activity_panel_tx.get_cloned();
 
-                    if let Some(uuid) = maybe_uuid {
-                        if let Some((_, GridPanel::Panel(activity_panel))) = activity_panels.iter().find(|(id, _)| *id == uuid) {
-                            activity_panel
-                                .activity_panel_tx
-                                .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
-                                .unwrap();
-                        }
-                    } else if let Some((_, GridPanel::Panel(activity_panel))) = activity_panels.iter().find(|(id, _)| *id == workspace.last_active_panel.get()) {
-                        activity_panel
-                            .activity_panel_tx
+                    if let Some(activity_panel_tx) = activity_panel_tx {
+                        activity_panel_tx
                             .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
-                            .unwrap();
+                            .unwrap();   
                     }
                 }
             }            

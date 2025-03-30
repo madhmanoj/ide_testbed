@@ -2,138 +2,64 @@ use std::rc::Rc;
 
 use activity_panel::ActivityPanel;
 use dominator::{clone, events, html, Dom, EventOptions};
-use futures_signals::{map_ref, signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt, VecDiff}};
-use uuid::Uuid;
+use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::MutableVec};
 use crate::styles;
+use panel::{GridAttributes, LayoutPanel};
 
 pub mod console;
 pub mod activity_panel;
+pub mod panel;
 
 const DEFAULT_CONSOLE_HEIGHT: u32 = 200;
 const RESIZER_PX: u32 = 3;
 
-#[derive(Clone)]
-pub enum GridPanel {
-    Panel(Rc<ActivityPanel>),
-    Resizer
-}
-
-#[derive(Clone)]
-pub enum ColumnType {
-    Auto,
-    Fr
-}
-
 pub struct Workspace {
-    pub activity_panel_list: MutableVec<(Uuid, GridPanel)>,
+    pub activity_panels: Rc<LayoutPanel>,
+    // to know which activity panel is active for file opening
+    pub active_panel: Mutable<Rc<ActivityPanel>>,
     console: Rc<console::Console>,
     pub console_height: Mutable<u32>,
     resize_active: Mutable<bool>,
     resizer_hover: Mutable<bool>,
-    pub last_active_panel: Mutable<Uuid>,
-    pub cols: MutableVec<ColumnType>
 }
 
 impl Default for Workspace {
     fn default() -> Self {
-        let uuid = Uuid::new_v4();
+        let activity_panels = Rc::new(LayoutPanel::VerticalSplit { parent: None, children: MutableVec::default()});
+        let panel = ActivityPanel::default();
+        activity_panels.append_widget(100.0, panel.clone());
 
         Self {
-            activity_panel_list: MutableVec::new_with_values(vec![
-                (uuid, GridPanel::Panel(ActivityPanel::default()))
-            ]),
+            activity_panels,
+            active_panel: Mutable::new(panel.clone()),
             console: Default::default(),
             console_height: Mutable::new(DEFAULT_CONSOLE_HEIGHT),
             resize_active: Mutable::new(false),
             resizer_hover: Mutable::new(false),
-            last_active_panel: Mutable::new(uuid),
-            cols: MutableVec::new_with_values(vec![
-                ColumnType::Fr
-            ])
         }
     }
 }
    
 // part of the problem is that I need to respond to the user moving the mouse, but also the size of the window
 impl Workspace {
-    
     pub fn render_activity_panel(
         this: &Rc<Workspace>,
         width: impl Signal<Item = u32> + 'static,
         height: impl Signal<Item = u32> + 'static
     ) -> Dom {
-        let width = width.broadcast();
-        let height = height.broadcast();
-
-        // vector to hold the widths of panels
-        let panel_widths: MutableVec<Mutable<i32>> = MutableVec::new();
-
-        // to track changes in the width of window and number of activity panels so that panels are split widthwise equally
-        let full_width_signal = map_ref! {
-            let total_width = width.signal(),
-            let num_panels = this.activity_panel_list.signal_vec_cloned().len() => {
-                let num_panels = *num_panels as u32;
-                let total_width = total_width - (((num_panels - 1) / 2) * 3);
-                total_width / ((num_panels + 1) / 2)
-            }
-        };
-
-        // to set the widths of new panels 
-        let full_width = Mutable::new(0 as i32);
+        let width = width.map(|width| width as f64).broadcast();
+        let height = height.map(|height| height as f64).broadcast();
 
         html!("div", {
             .class("col-span-1")
-            .class("row-span-1")  
-            .class("grid")
-            // future to track changes in width of individual panels based on changes in window or dropping panels
-            // ISSUE: it automatically resizes everytime you drop a panel or resize the window
-            .future(full_width_signal.for_each(clone!(panel_widths, full_width => move |full_width_value| clone!(panel_widths, full_width => async move {
-                full_width.set(full_width_value as i32);
-                for i in panel_widths.lock_mut().iter() {
-                    i.set(full_width_value as i32);
-                }
-            }))))
-            // future to handle removing widths of removed panels
-            .future(this.activity_panel_list.signal_vec_cloned().for_each(clone!(panel_widths => move |change| {
-                let mut panel_width_lock = panel_widths.lock_mut();
-
-                match change {
-                    VecDiff::RemoveAt { index } => {
-                        let true_index = index / 2;
-                        if index % 2 == 0 {
-                            web_sys::console::log_1(&format!("Removing width at index: {}", true_index).into());
-                            panel_width_lock.remove(true_index);
-                        }
-                    }
-                    _ => {}
-                }
-                async {}
-            })))
-            .style("overflow", "hidden")
-            .style_signal("width", width.signal().map(|width| format!("{}px", width)))
-            .style_signal("height", height.signal().map(|height| format!("{}px", height)))
-            .style_signal("grid-template-columns", this.cols.signal_vec_cloned()
-                .map(|col_type| match col_type {
-                    ColumnType::Auto => "3px".to_string(),
-                    ColumnType::Fr => "1fr".to_string()
-                })
-                .to_signal_cloned()
-                .map(|columns| columns.join(" "))
-            )
-            .children_signal_vec(this.activity_panel_list.signal_vec_cloned().enumerate().map(clone!(this, width, height => move |(index, (uuid, panel))| {
-                let index = index.get().unwrap();
-                match panel {
-                    GridPanel::Panel(panel) => {
-                        let index = index / 2;
-                        let w = Mutable::new(full_width.get());
-                        panel_widths.lock_mut().insert_cloned(index, w.clone());
-                        ActivityPanel::render(&this, &panel, &uuid, w.clone(), width.signal(), height.signal())
-                    },
-                    GridPanel::Resizer => {
-                        horizontal_resizer(&this, &uuid, panel_widths.clone())   
-                    }
-                }
-            })))
+            .class("row-span-1")
+            .child(LayoutPanel::render(
+                this,
+                &this.activity_panels,
+                GridAttributes { column_start: 1, column_end: 2, row_start: 1, row_end: 2 },
+                width.signal().boxed_local(),
+                height.signal().boxed_local(),
+            ))
         })
     }
 
@@ -199,76 +125,4 @@ impl Workspace {
             .child(this.console.render())
         })
     }
-}
-
-pub fn horizontal_resizer(
-    workspace: &Rc<Workspace>,
-    uuid: &Uuid,
-    panel_widths: MutableVec<Mutable<i32>>
-) -> Dom {
-    let resize_active = Mutable::new(false);
-    let resizer_hover = Mutable::new(false);
-    let initial_position = Mutable::new(0 as i32);
-
-    html!("div", {
-        .class("cursor-ew-resize")
-        .apply(|dom| styles::vertical_resizer(dom, resize_active.signal(), resizer_hover.signal()))
-        .event_with_options(&EventOptions::preventable(), clone!(resize_active, initial_position, uuid => move |event: events::PointerDown| {
-            web_sys::console::log_1(&format!("{uuid}").into());
-            initial_position.set(event.x());
-            resize_active.set_neq(true);
-            event.prevent_default();
-        }))
-        .global_event(clone!(resize_active => move |_: events::PointerUp| {
-            resize_active.set_neq(false);
-        }))
-        .event(clone!(resizer_hover => move |_: events::PointerEnter| {
-            resizer_hover.set_neq(true);
-        }))
-        .event(clone!(resizer_hover => move |_: events::PointerLeave| {
-            resizer_hover.set_neq(false);
-        }))
-        .global_event(clone!(resize_active, initial_position, panel_widths, workspace, uuid => move |event:events::PointerMove| {
-            if resize_active.get() {
-                // hardcoded min width for any given activity panel
-                let min_panel_width = 250;
-
-                let index = workspace.activity_panel_list
-                    .lock_ref()
-                    .iter()
-                    .position(|(target_uuid, panel)| matches!(panel, GridPanel::Resizer) && *target_uuid == uuid)
-                    .unwrap();
-
-                let left_index = (index - 1) / 2; // Get left panel index
-                let right_index = left_index + 1; // Ensure correct right panel index
-
-                let panel_width_lock = panel_widths.lock_ref();
-                
-                let left_panel_width = panel_width_lock.get(left_index).unwrap();
-                let right_panel_width = panel_width_lock.get(right_index).unwrap();
-
-                let offset = event.x() - initial_position.get();
-
-                let new_left_width = left_panel_width.get() + offset;
-                let new_right_width = right_panel_width.get() - offset;
-
-                // Ensure the panels do not shrink below min width
-                if new_left_width >= min_panel_width && new_right_width >= min_panel_width {
-                    left_panel_width.set(new_left_width);
-                    right_panel_width.set(new_right_width);
-                    initial_position.set(event.x());
-                } else if new_left_width < min_panel_width {
-                    // Prevent left panel from shrinking too much
-                    let max_offset = min_panel_width - left_panel_width.get();
-                    left_panel_width.set(min_panel_width);
-                    right_panel_width.set(right_panel_width.get() - max_offset);
-                } else if new_right_width < min_panel_width {
-                    // Prevent right panel from shrinking too much
-                    let max_offset = min_panel_width - right_panel_width.get();
-                    right_panel_width.set(min_panel_width);
-                    left_panel_width.set(left_panel_width.get() - max_offset);
-                }
-            }
-        }))
-    })
 }

@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use dominator::{clone, events, Dom, EventOptions, html};
-use crate::{styles, workspace::ColumnType};
+use crate::{styles, ColumnType};
 use futures_signals::{map_ref, signal::{self, Mutable, Signal, SignalExt}, signal_vec::MutableVec};
 
 pub mod explorer;
@@ -165,7 +165,9 @@ impl Sidebar {
                 .class("col-span-1")
                 .class("row-span-3")
                 .style("width", &format!("{RESIZER_PX}px"))
-                .apply(|dom| styles::vertical_resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
+                .class("max-h-screen")
+                .class("cursor-ew-resize")
+                .apply(|dom| styles::resizer(dom, this.resize_active.signal(), this.resizer_hover.signal()))
                 .event_with_options(&EventOptions::preventable(),
                     clone!(this => move |ev: events::PointerDown| {
                     this.resize_active.set_neq(true);

@@ -1,12 +1,12 @@
 use std::{pin::Pin, rc::Rc};
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions};
-use futures::{channel::mpsc::{self, UnboundedSender}, StreamExt};
+use futures::channel::mpsc::UnboundedSender;
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
-use uuid::Uuid;
-use crate::{styles, vfs};
+use crate::{styles, vfs, workspace::activity_panel};
 use crate::contextmenu::TabMenu;
-use super::Workspace;
+
+use super::panel::LayoutPanel;
 
 pub mod editor;
 pub mod welcome;
@@ -49,9 +49,9 @@ impl Activity {
     }
 
     fn render_tab(
-        workspace: &Rc<Workspace>,
+        panel: &Rc<LayoutPanel>,
         this: &Rc<Activity>,
-        panel: &Rc<ActivityPanel>
+        activity_panel: &Rc<ActivityPanel>
     ) -> dominator::Dom {
         let close_icon = svg!("svg", {
             .attr("height", "1em")
@@ -63,7 +63,7 @@ impl Activity {
 
         let mouse_over = Mutable::new(false);
         let mouse_over_close = Mutable::new(false);
-        let is_active = panel.active_activity.signal_ref(clone!(this => move |active_activity| {
+        let is_active = activity_panel.active_activity.signal_ref(clone!(this => move |active_activity| {
             active_activity.as_ref().is_some_and(|active_activity| Rc::ptr_eq(active_activity, &this))
         }));
         let tab_menu: Mutable<Option<TabMenu>> = Mutable::new(None);
@@ -78,8 +78,8 @@ impl Activity {
             .event(clone!(mouse_over => move |_: events::PointerOut| {
                 mouse_over.set_neq(false);
             }))
-            .event(clone!(panel, this => move |_: events::PointerDown| {                
-                panel.active_activity.set(Some(this.clone()))
+            .event(clone!(activity_panel, this => move |_: events::PointerDown| {                
+                activity_panel.active_activity.set(Some(this.clone()))
             }))
             .child(html!("div", {
                 .apply(styles::icon_text)
@@ -98,13 +98,13 @@ impl Activity {
                         .event(clone!(mouse_over_close => move |_: events::PointerOut| {
                             mouse_over_close.set_neq(false);
                         }))
-                        .event_with_options(&EventOptions::preventable(), clone!(panel, this => move |ev: events::PointerDown| {
+                        .event_with_options(&EventOptions::preventable(), clone!(activity_panel, this => move |ev: events::PointerDown| {
                             ev.stop_propagation();
-                            panel.activities.lock_mut().retain(|activity| !Rc::ptr_eq(activity, &this));
-                            let mut active_activity = panel.active_activity.lock_mut();
+                            activity_panel.activities.lock_mut().retain(|activity| !Rc::ptr_eq(activity, &this));
+                            let mut active_activity = activity_panel.active_activity.lock_mut();
                             if active_activity.as_ref().is_some_and(|active_activity| Rc::ptr_eq(active_activity, &this)) {
                                 // simple logic, VS Code is smart and keeps track of the last tab you looked at
-                                *active_activity = panel.activities.lock_ref().first().cloned();
+                                *active_activity = activity_panel.activities.lock_ref().first().cloned();
                             }
                         }))
                         .child(close_icon)
@@ -112,18 +112,15 @@ impl Activity {
                 })
             }))
             // rendering tab menu
-            .child_signal(tab_menu.signal_ref(clone!(workspace, panel => move |menu_state| {
-                menu_state.as_ref().and_then(clone!(workspace, panel => move |menu| {
-                    panel.active_activity.lock_ref().as_ref().map(|activity| {
-                        TabMenu::render(menu, &workspace, activity)
-                    })
-                }))
-            })))
+            .child_signal(tab_menu.signal_ref(|menu| {
+                menu.as_ref().map(|menu| menu.render())
+            }))
             // event handler for tab context menu
-            .event(clone!(tab_menu => move |event: events::ContextMenu| {
-                tab_menu.set(Some(TabMenu::new(
-                    (event.x(), event.y())
-                )));
+            .event(clone!(tab_menu, panel => move |event: events::ContextMenu| {
+                tab_menu.set(Some(TabMenu { 
+                    position: (event.x(), event.y()), 
+                    panel: panel.clone() 
+                }));
             }))
             // prevents default chrome context menu for the the tab bar
             .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
@@ -145,9 +142,10 @@ impl Activity {
 }
 
 pub struct ActivityPanel {
-    activities: MutableVec<Rc<Activity>>,
-    active_activity: Mutable<Option<Rc<Activity>>>,
-    pub activity_panel_tx: UnboundedSender<ActivityPanelCommand>
+    pub activities: MutableVec<Rc<Activity>>,
+    pub active_activity: Mutable<Option<Rc<Activity>>>,
+    // we set it during rendering, dont know how this is but it allows us to get rid of the wasm_bindgen::spawnlocal
+    pub activity_panel_tx: Mutable<Option<UnboundedSender<ActivityPanelCommand>>>
 }
 
 // clicking a file in the explorer opens the file in the editor
@@ -162,121 +160,53 @@ impl ActivityPanel {
 
     pub fn default() -> Rc<Self> {
         let welcome = Rc::new(Activity::Welcome(Rc::new(welcome::Welcome::new())));
-        let (tx, rx) = mpsc::unbounded();
-        let panel = Rc::new(Self {
+        Rc::new(Self {
             activities: vec![welcome.clone()].into(),
             active_activity: Some(welcome).into(),
-            activity_panel_tx: tx
-        });
-
-        wasm_bindgen_futures::spawn_local(rx.for_each(clone!(panel => move |command| clone!(panel => async move {
-            match command {
-                ActivityPanelCommand::OpenFile(file) => {
-                    let mut activities = panel.activities.lock_mut();
-                    let editor = activities.iter()
-                        .find(|activity| match &***activity {
-                            Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
-                            _ => false,
-                        })
-                        .cloned()
-                        .unwrap_or_else(move || {
-                            let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
-                            activities.push_cloned(editor.clone());
-                            editor
-                        });
-                    panel.active_activity.set(Some(editor));
-                },
-            }
-        }))));
-        panel
+            activity_panel_tx: Mutable::new(None)
+        })
     }
 
     pub fn new(activity: &Rc<Activity>) -> Rc<Self> {
-        let (tx, rx) = mpsc::unbounded();
-        let panel = Rc::new(Self {
+        Rc::new(Self {
             activities: vec![activity.clone()].into(),
             active_activity: Some(activity.clone()).into(),
-            activity_panel_tx: tx
-        });
-
-        wasm_bindgen_futures::spawn_local(rx.for_each(clone!(panel => move |command| clone!(panel => async move {
-            match command {
-                ActivityPanelCommand::OpenFile(file) => {
-                    let mut activities = panel.activities.lock_mut();
-                    let editor = activities.iter()
-                        .find(|activity| match &***activity {
-                            Activity::Editor(editor) => Rc::ptr_eq(&editor.file, &file),
-                            _ => false,
-                        })
-                        .cloned()
-                        .unwrap_or_else(move || {
-                            let editor = Rc::new(Activity::Editor(Rc::new(editor::Editor::new(file))));
-                            activities.push_cloned(editor.clone());
-                            editor
-                        });
-                    panel.active_activity.set(Some(editor));
-                },
-            }
-        }))));
-        panel
+            activity_panel_tx: Mutable::new(None)
+        })
     }
 
     pub fn render(
-        workspace: &Rc<Workspace>,
+        panel: &Rc<LayoutPanel>,
         this: &Rc<ActivityPanel>,
-        uuid: &Uuid,
-        width: Mutable<i32>,
-        max_width: impl Signal<Item = u32> + 'static,
-        max_height: impl Signal<Item = u32> + 'static
+        //width: impl Signal<Item = f64> + 'static,
+        height: impl Signal<Item = f64> + 'static
     ) -> dominator::Dom {
 
         let activity_count = this.activities.signal_vec_cloned().len().broadcast();
-        let max_width = max_width.broadcast();
-        let max_height = max_height.broadcast();
+        //let width = width.broadcast();
+        let height = height.broadcast();
 
         html!("div", {
+            .class("h-full")
+            .class("w-full")
             .class("col-span-1")
             .class("grid")
             .class("grid-rows-[auto_1fr]")
             .class("overflow-x-scroll")
-            .style_signal("max-height", max_height.signal().map(|max_height| format!("{}px", max_height)))
-            .style_signal("max-width", max_width.signal().map(|max_width| format!("{}px", max_width)))
-            .style_signal("width", width.signal().map(|width| format!("{}px", width)))
-            // future to remove empty activity panels, updating workspace layout, and resetting the last activity panel
-            // there might be a better way to implement this
-            .future(this.activities.signal_vec_cloned().len()
-                .for_each(clone!(workspace, uuid => move |count| clone!(workspace, uuid => async move {
-                    if count == 0 {
-                        // remove panel and associated resizer since they have the same uuid
-                        workspace.activity_panel_list.lock_mut().retain(|(target_uuid, _)| *target_uuid != uuid);
-                        // remove one 1fr from grid template (for panel)
-                        workspace.cols.lock_mut().remove(0);
-                        // remove one auto from grid template (for resizer)
-                        workspace.cols.lock_mut().remove(0);
-                        // set the last active panel as the first in the activity panel list
-                        workspace.last_active_panel.set(workspace.activity_panel_list.lock_ref().first().map(|(uuid, _)| *uuid).unwrap());
-                    }
-                })))
-            )
-            // event handler for swapping last active activity panel
-            .event(clone!(workspace, uuid => move |_: events::PointerDown| {
-                web_sys::console::log_1(&format!("{}", uuid).into());
-                workspace.last_active_panel.set(uuid);
-            }))
             // this takes up the full height but should only display when there are no activities
             // and hence no tab bar
-            .child_signal(activity_count.signal().map(clone!(max_height => move |count| {
-                (count == 0).then(|| Self::render_background(max_height.signal()))
+            .child_signal(activity_count.signal().map(clone!(height => move |count| {
+                (count == 0).then(|| Self::render_background(height.signal()))
             })))
             // tabs take up one full line
             .child(html!("div", {
                 .class("inline-flex")
                 .class("h-[35px]")
                 .apply(styles::tab::bar)
-                .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this, workspace => move |activity| {
+                .children_signal_vec(this.activities.signal_vec_cloned().map(clone!(this, panel => move |activity| {
                     html!("div", {
                         .class("h-full")
-                        .child(Activity::render_tab(&workspace, &activity, &this))
+                        .child(Activity::render_tab(&panel, &activity, &this))
                     })
                 })))
             }))
@@ -297,7 +227,7 @@ impl ActivityPanel {
     }
 
     fn render_background(
-        height: impl Signal<Item = u32> + 'static
+        height: impl Signal<Item = f64> + 'static
     ) -> Dom {
         html!("div", {
             .style_signal("height", height.map(|height| format!("{height}px")))
