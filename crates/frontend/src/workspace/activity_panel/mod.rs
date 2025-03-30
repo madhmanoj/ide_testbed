@@ -1,9 +1,9 @@
 use std::{pin::Pin, rc::Rc};
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions};
-use futures::channel::mpsc::UnboundedSender;
+use futures::{channel::mpsc::UnboundedSender, FutureExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::{MutableVec, SignalVecExt}};
-use crate::{styles, vfs, workspace::activity_panel};
+use crate::{styles, vfs};
 use crate::contextmenu::TabMenu;
 
 use super::panel::LayoutPanel;
@@ -11,7 +11,7 @@ use super::panel::LayoutPanel;
 pub mod editor;
 pub mod welcome;
 
-const TAB_HEIGHT: u32 = 35;
+//const TAB_HEIGHT: u32 = 35;
 
 pub enum ActivityPanelCommand {
     OpenFile(Rc<vfs::File>)
@@ -193,6 +193,96 @@ impl ActivityPanel {
             .class("grid")
             .class("grid-rows-[auto_1fr]")
             .class("overflow-x-scroll")
+            .future(activity_count.signal().wait_for(0).map(clone!(panel => move |_| {
+                if let LayoutPanel::Widget { parent: Some(parent), .. } = panel.as_ref() {
+                    match parent.as_ref() {
+                        LayoutPanel::HorizontalSplit { children, parent: grand_parent } | LayoutPanel::VerticalSplit { children, parent: grand_parent } => {
+                            // index should always be a Some value, since self should always be present in children mutablevec of its parent
+                            // otherwise panic since the panel is invalid
+                            let mut parent_children = children.lock_mut();
+                            let index = parent_children.iter().position(|(child, _)| {
+                                Rc::ptr_eq(child, &panel)
+                            }).unwrap();
+                            
+                            // remove widget
+                            parent_children.remove(index);
+
+                            // check if parent has only one child left, if yes, clean up the panel layout
+                            if parent_children.len() == 1 {
+                                // there is only 1 element according to the if condition
+                                let (only_child, _) = parent_children.first().unwrap();
+
+                                match only_child.as_ref() {
+                                    // for cases where the only child is a split, the logic is to promote all the panels of the child to the mutablevec 
+                                    // of the panel's parent
+                                    // this makes sense because in the nesting structure according to our implementation, there can only ever be a 
+                                    // horizontal split inside a vertical split and vice versa, and if we directly promote the split panel, we will have a 
+                                    // vertical split inside a vertical split (similarly for horizontal split) which is redundant
+                                    LayoutPanel::HorizontalSplit { children: only_child_children, .. }
+                                    | LayoutPanel::VerticalSplit { children: only_child_children, .. } => {
+                                        if let Some(grand_parent) = grand_parent {
+                                            match grand_parent.as_ref() {
+                                                LayoutPanel::HorizontalSplit { children: grand_parent_children, .. }
+                                                | LayoutPanel::VerticalSplit { children: grand_parent_children, .. } => {
+                                                    let mut grand_parent_children = grand_parent_children.lock_mut();
+                                                    if let Some(index) = grand_parent_children.iter().position(|(child, _)| Rc::ptr_eq(child, parent)) {
+                                                        for (i, (panel, size)) in only_child_children.lock_ref().iter().enumerate() {
+                                                            let new_child = match panel.as_ref() {
+                                                                LayoutPanel::HorizontalSplit { children, .. } => Rc::new(LayoutPanel::HorizontalSplit { 
+                                                                    parent: Some(grand_parent.clone()), 
+                                                                    children: children.clone() 
+                                                                }),
+                                                                LayoutPanel::VerticalSplit { children, .. } => Rc::new(LayoutPanel::VerticalSplit { 
+                                                                    parent: Some(grand_parent.clone()), 
+                                                                    children: children.clone()
+                                                                }),
+                                                                LayoutPanel::Widget { activity_panel, .. } => Rc::new(LayoutPanel::Widget { 
+                                                                    parent: Some(grand_parent.clone()), 
+                                                                    activity_panel: activity_panel.clone()
+                                                                })
+                                                            };
+                                                            let size = size.get();
+                                                            if i == 0 {
+                                                                grand_parent_children.set_cloned(index + i, (new_child.clone(), Mutable::new(size)));
+                                                            } else {
+                                                                grand_parent_children.insert_cloned(index + i, (new_child.clone(), Mutable::new(size)));
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                _ => {}
+                                            }
+                                        }  
+                                    },
+                                    // for cases where only_child is a widget, promote widget to the grand_parent directly if its the only panel left in the parent after removal of the original widget
+                                    LayoutPanel::Widget { activity_panel, .. } => {
+                                        let new_widget = Rc::new(LayoutPanel::Widget { 
+                                            parent: grand_parent.clone(), 
+                                            activity_panel: activity_panel.clone()
+                                        });
+
+                                        if let Some(grand_parent) = grand_parent {
+                                            match grand_parent.as_ref() {
+                                                LayoutPanel::HorizontalSplit { children: grand_parent_children, .. } 
+                                                | LayoutPanel::VerticalSplit { children: grand_parent_children, .. } => {
+                                                    let mut grand_parent_children = grand_parent_children.lock_mut();
+                                                    if let Some(index) = grand_parent_children.iter().position(|(child, _)| Rc::ptr_eq(child, parent)) {
+                                                        let size = grand_parent_children[index].1.get();
+                                                        grand_parent_children.set_cloned(index, (new_widget, Mutable::new(size)));
+                                                    }
+                                                },
+                                                _ => {}
+                                            }
+                                        }
+                                    },
+                                }
+
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            })))
             // this takes up the full height but should only display when there are no activities
             // and hence no tab bar
             .child_signal(activity_count.signal().map(clone!(height => move |count| {
