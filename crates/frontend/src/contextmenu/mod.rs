@@ -1,7 +1,8 @@
 use std::rc::Rc;
 use dominator::{Dom, html, clone, events};
+use futures_signals::signal::Mutable;
 use crate::workspace::panel::LayoutPanel;
-use crate::{styles, vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE, sidebar::explorer::RENAME};
+use crate::{styles, vfs::{Directory, File}, DEFAULT_DIRECTORY_MODE, DEFAULT_FILE_MODE};
 #[derive(Clone)]
 pub enum Target {
     File(Rc<File>), 
@@ -24,7 +25,8 @@ impl ContextMenu {
     }
 
     pub fn folder_menu_render(
-        context_menu: &ContextMenu
+        context_menu: &ContextMenu,
+        rename: Mutable<Option<Target>>
     ) -> Dom {
         html!("div", {
             .style("position", "absolute")
@@ -37,26 +39,24 @@ impl ContextMenu {
                 html!("div", {
                     .text("New Folder")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_: events::MouseDown| {
-                        context_menu.add_folder();
+                    .event(clone!(context_menu, rename => move |_: events::MouseDown| {
+                        context_menu.add_folder(rename.clone());
                     }))
                 }), 
                 html!("div", {
                     .text("New File")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_: events::MouseDown| {
-                        context_menu.add_file();
+                    .event(clone!(context_menu, rename => move |_: events::MouseDown| {
+                        context_menu.add_file(rename.clone());
                     }))
                 }),
                 html!("div", {
                     .text("Rename Folder")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_: events::MouseDown| {
+                    .event(clone!(context_menu, rename => move |_: events::MouseDown| {
                         web_sys::console::log_1(&"Hello bois".into());
                         if let Target::Directory(dir) = &context_menu.target  {
-                            RENAME.with(|rename| {
-                                rename.set(Some(Target::Directory(dir.clone())));
-                            });
+                            rename.set(Some(Target::Directory(dir.clone())));
                         }
                     }))
                 })
@@ -65,7 +65,8 @@ impl ContextMenu {
     }
     
     pub fn file_menu_render(
-        context_menu: &ContextMenu
+        context_menu: &ContextMenu,
+        rename: Mutable<Option<Target>>
     ) -> Dom {
         html!("div", {
             .style("position", "absolute")
@@ -78,11 +79,9 @@ impl ContextMenu {
                 html!("div", {
                     .text("Rename File")
                     .apply(styles::contextmenu::option)
-                    .event(clone!(context_menu => move |_: events::MouseDown| {
+                    .event(clone!(context_menu, rename => move |_: events::MouseDown| {
                         if let Target::File(file) = &context_menu.target  {
-                            RENAME.with(|rename| {
-                                rename.set(Some(Target::File(file.clone())));
-                            });
+                            rename.set(Some(Target::File(file.clone())));
                         }
                     }))
                 })
@@ -92,7 +91,8 @@ impl ContextMenu {
 
     // to add folder under a folder
     pub fn add_folder(
-        &self
+        &self, 
+        rename: Mutable<Option<Target>>
     ) {
         // initialise a new directory
         let new_directory = Rc::new(
@@ -108,15 +108,14 @@ impl ContextMenu {
         if let Target::Directory(dir) = &self.target {
             dir.directories.lock_mut().push_cloned(new_directory.clone());
             // this signals renaming after creating and pushing it into the directory structure
-            RENAME.with(|rename| {
-                rename.set(Some(Target::Directory(new_directory.clone())));
-            });
+            rename.set(Some(Target::Directory(new_directory.clone())));
         } 
     }
 
     // to add file under a folder
     pub fn add_file(
-        &self
+        &self,
+        rename: Mutable<Option<Target>>
     ) {
         // initialise a new file
         let new_file = Rc::new(
@@ -131,9 +130,7 @@ impl ContextMenu {
         if let Target::Directory(dir) = &self.target {
             dir.files.lock_mut().push_cloned(new_file.clone());
             // this signals renaming after creating and pushing it into the directory structure
-            RENAME.with(|rename| {
-                rename.set(Some(Target::File(new_file.clone())));
-            });
+            rename.set(Some(Target::File(new_file.clone())));
         }
     }
 }

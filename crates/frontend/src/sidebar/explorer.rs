@@ -3,16 +3,11 @@ use std::rc::Rc;
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
 
-use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::Directory};
+use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::Directory, workspace::Workspace};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
      18V6L16 0M20 18H8V2H15V7H20V18M4 4V22H20V24H4C2.9 24 2 23.1 2 22V4H4Z";
-
-thread_local! {
-    static DRAGGED_ITEM: Mutable<Option<Target>> = Mutable::new(None);
-    pub static RENAME: Mutable<Option<Target>> = Mutable::new(None);
-}
      
 fn folder_open_icon() -> Dom {
     // downward arrow
@@ -80,55 +75,50 @@ fn find_and_remove_from_parent(target: &Target, root: &Rc<Directory>) {
 }
 
 fn render_contents(
+    explorer: &Rc<Explorer>,
     directory: &Rc<Directory>,
-    workspace_command_tx: &crate::WorkspaceCommandSender, 
-    context_menu: Mutable<Option<ContextMenu>>
+    workspace_command_tx: &crate::WorkspaceCommandSender
 ) -> Dom {
     let directories = directory.directories
         .signal_vec_cloned()
         .sort_by_cloned(|left_directory, right_directory|
             left_directory.name.lock_ref().cmp(&*right_directory.name.lock_ref()))
-        .map(clone!(workspace_command_tx, context_menu => move |directory| {
+        .map(clone!(workspace_command_tx, explorer => move |directory| {
             let expanded = Mutable::new(true);
             html!("li", {
                 .apply(styles::vfs_item::list)
                 .attr("draggable", "true")
-                .event(clone!(directory => move |_: events::DragStart| {
-                    DRAGGED_ITEM.with(|dragged| {
-                        dragged.set(Some(Target::Directory(directory.clone())));
-                    })
+                .event(clone!(directory, explorer => move |_: events::DragStart| {
+                    explorer.dragged.set(Some(Target::Directory(directory.clone())));
                 }))
                 .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                     event.prevent_default(); // Allow drop
                 })
-                .event_with_options(&EventOptions::preventable(), clone!(directory => move |event: events::Drop| {
+                .event_with_options(&EventOptions::preventable(), clone!(directory, explorer => move |event: events::Drop| {
                     event.prevent_default();
-                    DRAGGED_ITEM.with(|dragged| {
-                        if let Some(target) = dragged.get_cloned() {
-                            crate::PROJECT.with(|root| {
-                                // Remove the dragged item from its original parent
-                                find_and_remove_from_parent(&target, root);
-                            });
-                
-                            // Add the dragged item to the target directory
-                            match target {
-                                Target::File(file) => directory.files.lock_mut().push_cloned(file),
-                                Target::Directory(dragged_dir) => directory.directories.lock_mut().push_cloned(dragged_dir),
-                            }
+                    if let Some(target) = explorer.dragged.get_cloned() {
+                        crate::PROJECT.with(|root| {
+                            // Remove the dragged item from its original parent
+                            find_and_remove_from_parent(&target, root);
+                        });
+            
+                        // Add the dragged item to the target directory
+                        match target {
+                            Target::File(file) => directory.files.lock_mut().push_cloned(file),
+                            Target::Directory(dragged_dir) => directory.directories.lock_mut().push_cloned(dragged_dir),
                         }
-                    });
+                    }
+                    explorer.dragged.set(None);
                 }))
-                .event(|_: events::DragEnd| {
-                    DRAGGED_ITEM.with(|dragged| {
-                        dragged.set(None);
-                    });
-                })
+                .event(clone!(explorer => move |_: events::DragEnd| {
+                    explorer.dragged.set(None);
+                }))
                 .child(html!("div", {
                     .apply(styles::vfs_item::body)
-                    .event(clone!(expanded => move |event: events::MouseDown| {
+                    .event(clone!(expanded, explorer => move |event: events::MouseDown| {
                         // left click to expand directory
-                        let rename = RENAME.with(|rename| rename.get_cloned().is_some());
-                        let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
+                        let rename = explorer.rename.get_cloned().is_some();
+                        let is_drag_and_drop = explorer.dragged.get_cloned().is_some();
                         if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                             let mut expanded = expanded.lock_mut();
                             *expanded = !*expanded;
@@ -144,7 +134,7 @@ fn render_contents(
                         }),
                         html!("div", {
                             // input box for renaming
-                            .child_signal(RENAME.with(|rename| rename.signal_cloned().map(clone!(directory => move |global_target| {
+                            .child_signal(explorer.rename.signal_cloned().map(clone!(directory, explorer => move |global_target| {
                                 match global_target {
                                     Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &directory) => {
                                         Some(html!("input" => web_sys::HtmlInputElement, {
@@ -155,14 +145,14 @@ fn render_contents(
                                                 .event(clone!(directory => move |_: events::Input| {
                                                     directory.name.set(element.value());
                                                 }))
-                                                .event(|_: events::Blur| {
-                                                    RENAME.with(|rename| rename.set(None));
-                                                })
-                                                .event(|event: events::KeyDown| {
+                                                .event(clone!(explorer => move |_: events::Blur| {
+                                                    explorer.rename.set(None);
+                                                }))
+                                                .event(clone!(explorer => move |event: events::KeyDown| {
                                                     if event.key() == "Enter" {
-                                                        RENAME.with(|rename| rename.set(None));
+                                                        explorer.rename.set(None);
                                                     }
-                                                })
+                                                }))
                                             })
                                         }))
                                     },
@@ -170,20 +160,20 @@ fn render_contents(
                                         .text_signal(directory.name.signal_cloned())
                                     })),
                                 }
-                            }))))
+                            })))
                         })
                     ])
                     // event listener for right click
-                    .event(clone!(context_menu, directory => move |event: events::ContextMenu| {
+                    .event(clone!(explorer, directory => move |event: events::ContextMenu| {
                         web_sys::console::log_1(&"Right-clicked".into());
-                        context_menu.set(Some(ContextMenu::new(
+                        explorer.context_menu.set(Some(ContextMenu::new(
                             (event.x(), event.y()),
                             Target::Directory(directory.clone()),
                         )));
                     }))
                 }))
-                .child_signal(expanded.signal_ref(clone!(directory, workspace_command_tx, context_menu => move |expanded| {
-                    expanded.then_some(render_contents(&directory, &workspace_command_tx, context_menu.clone()))
+                .child_signal(expanded.signal_ref(clone!(explorer, directory, workspace_command_tx => move |expanded| {
+                    expanded.then_some(render_contents(&explorer, &directory, &workspace_command_tx))
                 })))
             })
         }));
@@ -192,28 +182,24 @@ fn render_contents(
         .signal_vec_cloned()
         .sort_by_cloned(|left_file, right_file|
             left_file.name.lock_ref().cmp(&*right_file.name.lock_ref()))
-        .map(clone!(workspace_command_tx => move |file| html!("li", {
+        .map(clone!(workspace_command_tx, explorer => move |file| html!("li", {
             .apply(styles::vfs_item::list)
             .attr("draggable", "true")
-            .event(clone!(file => move |_: events::DragStart| {
-                DRAGGED_ITEM.with(|dragged| {
-                    dragged.set(Some(Target::File(file.clone())));
-                })
+            .event(clone!(file, explorer => move |_: events::DragStart| {
+                explorer.dragged.set(Some(Target::File(file.clone())));
             }))
             .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                 event.prevent_default(); // Allow drop
             })
-            .event(|_: events::DragEnd| {
-                DRAGGED_ITEM.with(|dragged| {
-                    dragged.set(None);
-                });
-            })
+            .event(clone!(explorer => move |_: events::DragEnd| {
+                explorer.dragged.set(None);
+            }))
             .child(html!("div", {
                 .apply(styles::vfs_item::body)
-                .event(clone!(workspace_command_tx, file => move |event: events::MouseDown| {
+                .event(clone!(workspace_command_tx, file, explorer => move |event: events::MouseDown| {
                     // left-click to open file in workspace
-                    let rename = RENAME.with(|rename| rename.get_cloned().is_some());
-                    let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
+                    let rename = explorer.rename.get_cloned().is_some();
+                    let is_drag_and_drop = explorer.dragged.get_cloned().is_some();
                     if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
                         workspace_command_tx
                             .unbounded_send(crate::WorkspaceCommand::OpenFile(file.clone()))
@@ -227,7 +213,7 @@ fn render_contents(
                     }),
                     html!("div", {
                         // input box for renaming
-                        .child_signal(RENAME.with(|rename| rename.signal_cloned().map(clone!(file => move |target| {
+                        .child_signal(explorer.rename.signal_cloned().map(clone!(file, explorer => move |target| {
                             match target {
                                 Some(Target::File(ref fil)) if Rc::ptr_eq(fil, &file) => {
                                     Some(html!("input" => web_sys::HtmlInputElement, {
@@ -239,14 +225,14 @@ fn render_contents(
                                                 file.name.set(element.value());
                                                 element.focus().unwrap();
                                             }))
-                                            .event(|_: events::Blur| {
-                                                RENAME.with(|rename| rename.set(None));
-                                            })
-                                            .event(|event: events::KeyDown| {
+                                            .event(clone!(explorer => move |_: events::Blur| {
+                                                explorer.rename.set(None);
+                                            }))
+                                            .event(clone!(explorer => move |event: events::KeyDown| {
                                                 if event.key() == "Enter" {
-                                                    RENAME.with(|rename| rename.set(None));
+                                                    explorer.rename.set(None);
                                                 }
-                                            })
+                                            }))
                                         })
                                     }))
                                 },
@@ -254,13 +240,13 @@ fn render_contents(
                                     .text_signal(file.name.signal_cloned())
                                 })),
                             }
-                        }))))
+                        })))
                     })
                 ])
                 // event listener for right click
-                .event(clone!(context_menu => move |event: events::ContextMenu| {
+                .event(clone!(explorer => move |event: events::ContextMenu| {
                     web_sys::console::log_1(&"Right-clicked".into());
-                    context_menu.set(Some(ContextMenu::new(
+                    explorer.context_menu.set(Some(ContextMenu::new(
                         (event.x(), event.y()),
                         Target::File(file.clone())
                     )));
@@ -277,7 +263,9 @@ fn render_contents(
 pub struct Explorer {
     workspace: Rc<Directory>,
     // context menu
-    context_menu: Mutable<Option<ContextMenu>>
+    context_menu: Mutable<Option<ContextMenu>>,
+    dragged: Mutable<Option<Target>>,
+    rename: Mutable<Option<Target>>
 }
 
 impl Default for Explorer {
@@ -285,6 +273,8 @@ impl Default for Explorer {
         Self {
             workspace: crate::PROJECT.with(|workspace| Rc::clone(workspace)),
             context_menu: Mutable::new(None),
+            dragged: Mutable::new(None),
+            rename: Mutable::new(None)
         }
     }
 }
@@ -312,33 +302,28 @@ impl Explorer {
                     })
                     .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
                         event.prevent_default();
-                        DRAGGED_ITEM.with(|dragged| {
-                            if let Some(target) = dragged.get_cloned() {
-                                crate::PROJECT.with(|root| {
-                                    // Remove the dragged item from its original parent
-                                    find_and_remove_from_parent(&target, root);
-                                });
-                    
-                                // Add the dragged item to the target directory
-                                match target {
-                                    Target::File(file) => this.workspace.files.lock_mut().push_cloned(file),
-                                    Target::Directory(dragged_dir) => this.workspace.directories.lock_mut().push_cloned(dragged_dir),
-                                }
+                        if let Some(target) = this.dragged.get_cloned() {
+                            crate::PROJECT.with(|root| {
+                                // Remove the dragged item from its original parent
+                                find_and_remove_from_parent(&target, root);
+                            });
+                
+                            // Add the dragged item to the target directory
+                            match target {
+                                Target::File(file) => this.workspace.files.lock_mut().push_cloned(file),
+                                Target::Directory(dragged_dir) => this.workspace.directories.lock_mut().push_cloned(dragged_dir),
                             }
-                        });
+                        }
+                        this.dragged.set(None);
                     }))
-                    .event(|_: events::DragEnd| {
-                        DRAGGED_ITEM.with(|dragged| {
-                            dragged.set(None);
-                        });
-                    })
+                    .event(clone!(this => move |_: events::DragEnd| {
+                        this.dragged.set(None);
+                    }))
                     .child(html!("div", {
                         .apply(styles::vfs_item::body)
                         .event(clone!(expanded => move |event: events::MouseDown| {
                             // left-click to expand directory
-                            let rename = RENAME.with(|rename| rename.get_cloned().is_some());
-                            let is_drag_and_drop = DRAGGED_ITEM.with(|dragged| dragged.get_cloned().is_some());
-                            if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
+                            if event.button() == MouseButton::Left {
                                 let mut expanded = expanded.lock_mut();
                                 *expanded = !*expanded;
                             }
@@ -353,7 +338,7 @@ impl Explorer {
                             }),
                             html!("div", {
                                 // input box for renaming
-                                .child_signal(RENAME.with(|rename| rename.signal_cloned().map(clone!(this => move |target| {
+                                .child_signal(this.rename.signal_cloned().map(clone!(this => move |target| {
                                     match target {
                                         Some(Target::Directory(ref dir)) if Rc::ptr_eq(dir, &this.workspace) => {
                                             Some(html!("input" => web_sys::HtmlInputElement, {
@@ -364,14 +349,14 @@ impl Explorer {
                                                     .event(clone!(this => move |_: events::Input| {
                                                         this.workspace.name.set(element.value());
                                                     }))
-                                                    .event(|_: events::Blur| {
-                                                        RENAME.with(|rename| rename.set(None));
-                                                    })
-                                                    .event(|event: events::KeyDown| {
+                                                    .event(clone!(this => move |_: events::Blur| {
+                                                        this.rename.set(None);
+                                                    }))
+                                                    .event(clone!(this => move |event: events::KeyDown| {
                                                         if event.key() == "Enter" {
-                                                            RENAME.with(|rename| rename.set(None));
+                                                            this.rename.set(None);
                                                         }
-                                                    })
+                                                    }))
                                                 })
                                             }))
                                         },
@@ -379,7 +364,7 @@ impl Explorer {
                                             .text_signal(this.workspace.name.signal_cloned())
                                         })),
                                     }
-                                }))))
+                                })))
                             })
                         ])
                         // event listener for right click
@@ -392,14 +377,14 @@ impl Explorer {
                         }))
                     }))
                     // check for update in show to render context menu
-                    .child_signal(this.context_menu.signal_ref(|menu_state| {
-                        menu_state.as_ref().map(|menu| {
+                    .child_signal(this.context_menu.signal_ref(clone!(this => move |menu_state| {
+                        menu_state.as_ref().map(clone!(this => move |menu| {
                             match &menu.target {
-                                Target::Directory(_) => ContextMenu::folder_menu_render(menu),
-                                Target::File(_) => ContextMenu::file_menu_render(menu),
+                                Target::Directory(_) => ContextMenu::folder_menu_render(menu, this.rename.clone()),
+                                Target::File(_) => ContextMenu::file_menu_render(menu, this.rename.clone()),
                             }
-                        })
-                    }))
+                        }))
+                    })))
                     // prevents default chrome context menu for the whole vfs structure
                     .event_with_options(&EventOptions::preventable(), |event: events::ContextMenu| {
                         event.prevent_default();
@@ -415,7 +400,7 @@ impl Explorer {
                         this.context_menu.set(None);
                     }))
                     .child_signal(expanded.signal_ref(clone!(this, workspace_command_tx => move |expanded| {
-                        expanded.then_some(render_contents(&this.workspace, &workspace_command_tx, this.context_menu.clone()))
+                        expanded.then_some(render_contents(&this, &this.workspace, &workspace_command_tx))
                     })))
                 }))
             }))
