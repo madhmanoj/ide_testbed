@@ -89,13 +89,21 @@ fn render_contents(
                 .apply(styles::vfs_item::list)
                 .attr("draggable", "true")
                 .event(clone!(directory, explorer => move |_: events::DragStart| {
+                    // testing
+                    web_sys::console::log_1(&format!("directory drag start: {}", directory.name.get_cloned()).into());
                     explorer.dragged.set(Some(Target::Directory(directory.clone())));
+                }))
+                .event(clone!(directory => move |_: events::DragEnter| {
+                    web_sys::console::log_1(&directory.name.get_cloned().to_string().into());
                 }))
                 .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                     event.prevent_default(); // Allow drop
                 })
                 .event_with_options(&EventOptions::preventable(), clone!(directory, explorer => move |event: events::Drop| {
+                    // testing
+                    web_sys::console::log_1(&format!("dropping into directory: {}", directory.name.get_cloned()).into());
                     event.prevent_default();
+                    //event.stop_propagation();
                     if let Some(target) = explorer.dragged.get_cloned() {
                         crate::PROJECT.with(|root| {
                             // Remove the dragged item from its original parent
@@ -110,16 +118,17 @@ fn render_contents(
                     }
                     explorer.dragged.set(None);
                 }))
-                .event(clone!(explorer => move |_: events::DragEnd| {
+                .event(clone!(explorer, directory => move |_: events::DragEnd| {
+                    // testing
+                    web_sys::console::log_1(&format!("ending drag: {}", directory.name.get_cloned()).into());
                     explorer.dragged.set(None);
                 }))
                 .child(html!("div", {
                     .apply(styles::vfs_item::body)
-                    .event(clone!(expanded, explorer => move |event: events::MouseDown| {
+                    .event(clone!(expanded, explorer => move |event: events::Click| {
                         // left click to expand directory
-                        let rename = explorer.rename.get_cloned().is_some();
-                        let is_drag_and_drop = explorer.dragged.get_cloned().is_some();
-                        if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
+                        let rename_active = explorer.rename.get_cloned().is_none();
+                        if rename_active && event.button() == MouseButton::Left {
                             let mut expanded = expanded.lock_mut();
                             *expanded = !*expanded;
                         }
@@ -186,21 +195,24 @@ fn render_contents(
             .apply(styles::vfs_item::list)
             .attr("draggable", "true")
             .event(clone!(file, explorer => move |_: events::DragStart| {
+                // testing
+                web_sys::console::log_1(&format!("file drag start: {}", file.name.get_cloned()).into());
                 explorer.dragged.set(Some(Target::File(file.clone())));
             }))
             .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                 event.prevent_default(); // Allow drop
             })
-            .event(clone!(explorer => move |_: events::DragEnd| {
+            .event(clone!(explorer, file => move |_: events::DragEnd| {
+                // testing
+                web_sys::console::log_1(&format!("ending drag: {}", file.name.get_cloned()).into());
                 explorer.dragged.set(None);
             }))
             .child(html!("div", {
                 .apply(styles::vfs_item::body)
-                .event(clone!(workspace_command_tx, file, explorer => move |event: events::MouseDown| {
+                .event(clone!(workspace_command_tx, file, explorer => move |event: events::Click| {
                     // left-click to open file in workspace
-                    let rename = explorer.rename.get_cloned().is_some();
-                    let is_drag_and_drop = explorer.dragged.get_cloned().is_some();
-                    if !rename && !is_drag_and_drop && event.button() == MouseButton::Left {
+                    let rename_active = explorer.rename.get_cloned().is_none();
+                    if rename_active && event.button() == MouseButton::Left {
                         workspace_command_tx
                             .unbounded_send(crate::WorkspaceCommand::OpenFile(file.clone()))
                             .unwrap()
@@ -297,11 +309,17 @@ impl Explorer {
             .child(html!("ul", {
                 .child(html!("li", {
                     .attr("draggable", "true")
+                    .event(clone!(this => move |_: events::DragEnter| {
+                        web_sys::console::log_1(&this.workspace.name.get_cloned().to_string().into());
+                    }))
                     .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                         event.prevent_default(); // Allow drop
                     })
                     .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
+                        // testing
+                        web_sys::console::log_1(&format!("dropping into root: {}", this.workspace.name.get_cloned()).into());
                         event.prevent_default();
+                        //event.stop_propagation();
                         if let Some(target) = this.dragged.get_cloned() {
                             crate::PROJECT.with(|root| {
                                 // Remove the dragged item from its original parent
@@ -317,13 +335,16 @@ impl Explorer {
                         this.dragged.set(None);
                     }))
                     .event(clone!(this => move |_: events::DragEnd| {
+                        // testing
+                        web_sys::console::log_1(&format!("ending drag: {}", this.workspace.name.get_cloned()).into());
                         this.dragged.set(None);
                     }))
                     .child(html!("div", {
                         .apply(styles::vfs_item::body)
-                        .event(clone!(expanded => move |event: events::MouseDown| {
+                        .event(clone!(expanded, this => move |event: events::Click| {
                             // left-click to expand directory
-                            if event.button() == MouseButton::Left {
+                            let rename_active = this.rename.get_cloned().is_none();
+                            if rename_active && event.button() == MouseButton::Left {
                                 let mut expanded = expanded.lock_mut();
                                 *expanded = !*expanded;
                             }

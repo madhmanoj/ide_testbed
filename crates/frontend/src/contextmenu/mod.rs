@@ -54,7 +54,6 @@ impl ContextMenu {
                     .text("Rename Folder")
                     .apply(styles::contextmenu::option)
                     .event(clone!(context_menu, rename => move |_: events::MouseDown| {
-                        web_sys::console::log_1(&"Hello bois".into());
                         if let Target::Directory(dir) = &context_menu.target  {
                             rename.set(Some(Target::Directory(dir.clone())));
                         }
