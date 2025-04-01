@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
+use web_sys::console::dir;
 
 use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::Directory, workspace::Workspace};
 
@@ -89,39 +90,10 @@ fn render_contents(
                 .apply(styles::vfs_item::list)
                 .attr("draggable", "true")
                 .event(clone!(directory, explorer => move |_: events::DragStart| {
-                    // testing
-                    web_sys::console::log_1(&format!("directory drag start: {}", directory.name.get_cloned()).into());
                     explorer.dragged.set(Some(Target::Directory(directory.clone())));
                 }))
-                .event(clone!(directory => move |_: events::DragEnter| {
-                    web_sys::console::log_1(&directory.name.get_cloned().to_string().into());
-                }))
-                .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
-                    event.prevent_default(); // Allow drop
-                })
-                .event_with_options(&EventOptions::preventable(), clone!(directory, explorer => move |event: events::Drop| {
-                    // testing
-                    web_sys::console::log_1(&format!("dropping into directory: {}", directory.name.get_cloned()).into());
-                    event.prevent_default();
-                    //event.stop_propagation();
-                    if let Some(target) = explorer.dragged.get_cloned() {
-                        crate::PROJECT.with(|root| {
-                            // Remove the dragged item from its original parent
-                            find_and_remove_from_parent(&target, root);
-                        });
-            
-                        // Add the dragged item to the target directory
-                        match target {
-                            Target::File(file) => directory.files.lock_mut().push_cloned(file),
-                            Target::Directory(dragged_dir) => directory.directories.lock_mut().push_cloned(dragged_dir),
-                        }
-                    }
-                    explorer.dragged.set(None);
-                }))
-                .event(clone!(explorer, directory => move |_: events::DragEnd| {
-                    // testing
-                    web_sys::console::log_1(&format!("ending drag: {}", directory.name.get_cloned()).into());
-                    explorer.dragged.set(None);
+                .event(clone!(directory, explorer => move |_: events::DragEnter| {
+                    explorer.drop_target.set(Some(directory.clone()));
                 }))
                 .child(html!("div", {
                     .apply(styles::vfs_item::body)
@@ -173,8 +145,8 @@ fn render_contents(
                         })
                     ])
                     // event listener for right click
-                    .event(clone!(explorer, directory => move |event: events::ContextMenu| {
-                        web_sys::console::log_1(&"Right-clicked".into());
+                    .event(clone!(explorer, directory, expanded => move |event: events::ContextMenu| {
+                        expanded.set(true);
                         explorer.context_menu.set(Some(ContextMenu::new(
                             (event.x(), event.y()),
                             Target::Directory(directory.clone()),
@@ -195,17 +167,7 @@ fn render_contents(
             .apply(styles::vfs_item::list)
             .attr("draggable", "true")
             .event(clone!(file, explorer => move |_: events::DragStart| {
-                // testing
-                web_sys::console::log_1(&format!("file drag start: {}", file.name.get_cloned()).into());
                 explorer.dragged.set(Some(Target::File(file.clone())));
-            }))
-            .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
-                event.prevent_default(); // Allow drop
-            })
-            .event(clone!(explorer, file => move |_: events::DragEnd| {
-                // testing
-                web_sys::console::log_1(&format!("ending drag: {}", file.name.get_cloned()).into());
-                explorer.dragged.set(None);
             }))
             .child(html!("div", {
                 .apply(styles::vfs_item::body)
@@ -257,7 +219,6 @@ fn render_contents(
                 ])
                 // event listener for right click
                 .event(clone!(explorer => move |event: events::ContextMenu| {
-                    web_sys::console::log_1(&"Right-clicked".into());
                     explorer.context_menu.set(Some(ContextMenu::new(
                         (event.x(), event.y()),
                         Target::File(file.clone())
@@ -277,7 +238,8 @@ pub struct Explorer {
     // context menu
     context_menu: Mutable<Option<ContextMenu>>,
     dragged: Mutable<Option<Target>>,
-    rename: Mutable<Option<Target>>
+    rename: Mutable<Option<Target>>,
+    drop_target: Mutable<Option<Rc<Directory>>>
 }
 
 impl Default for Explorer {
@@ -286,7 +248,8 @@ impl Default for Explorer {
             workspace: crate::PROJECT.with(|workspace| Rc::clone(workspace)),
             context_menu: Mutable::new(None),
             dragged: Mutable::new(None),
-            rename: Mutable::new(None)
+            rename: Mutable::new(None),
+            drop_target: Mutable::new(None)
         }
     }
 }
@@ -310,33 +273,31 @@ impl Explorer {
                 .child(html!("li", {
                     .attr("draggable", "true")
                     .event(clone!(this => move |_: events::DragEnter| {
-                        web_sys::console::log_1(&this.workspace.name.get_cloned().to_string().into());
+                        this.drop_target.set(Some(this.workspace.clone()));
                     }))
                     .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                         event.prevent_default(); // Allow drop
                     })
                     .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
-                        // testing
-                        web_sys::console::log_1(&format!("dropping into root: {}", this.workspace.name.get_cloned()).into());
                         event.prevent_default();
-                        //event.stop_propagation();
                         if let Some(target) = this.dragged.get_cloned() {
-                            crate::PROJECT.with(|root| {
-                                // Remove the dragged item from its original parent
-                                find_and_remove_from_parent(&target, root);
-                            });
-                
-                            // Add the dragged item to the target directory
-                            match target {
-                                Target::File(file) => this.workspace.files.lock_mut().push_cloned(file),
-                                Target::Directory(dragged_dir) => this.workspace.directories.lock_mut().push_cloned(dragged_dir),
+                            if let Some(drop_target) = this.drop_target.get_cloned() {
+                                crate::PROJECT.with(|root| {
+                                    // Remove the dragged item from its original parent
+                                    find_and_remove_from_parent(&target, root);
+                                });
+                    
+                                // Add the dragged item to the target directory
+                                match target {
+                                    Target::File(file) => drop_target.files.lock_mut().push_cloned(file),
+                                    Target::Directory(dragged_dir) => drop_target.directories.lock_mut().push_cloned(dragged_dir),
+                                }
                             }
                         }
                         this.dragged.set(None);
+                        this.drop_target.set(None);
                     }))
                     .event(clone!(this => move |_: events::DragEnd| {
-                        // testing
-                        web_sys::console::log_1(&format!("ending drag: {}", this.workspace.name.get_cloned()).into());
                         this.dragged.set(None);
                     }))
                     .child(html!("div", {
@@ -390,7 +351,6 @@ impl Explorer {
                         ])
                         // event listener for right click
                         .event(clone!(this => move |event: events::ContextMenu| {
-                            web_sys::console::log_1(&"Right-clicked".into());
                             this.context_menu.set(Some(ContextMenu::new(
                                 (event.x(), event.y()),
                                 Target::Directory(this.workspace.clone()),
