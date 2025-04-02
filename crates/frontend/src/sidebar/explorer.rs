@@ -2,9 +2,8 @@ use std::rc::Rc;
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
-use web_sys::console::dir;
 
-use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::Directory, workspace::Workspace};
+use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::Directory};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -93,6 +92,7 @@ fn render_contents(
                     explorer.dragged.set(Some(Target::Directory(directory.clone())));
                 }))
                 .event(clone!(directory, explorer => move |_: events::DragEnter| {
+                    web_sys::console::log_1(&directory.name.get_cloned().to_string().into());
                     explorer.drop_target.set(Some(directory.clone()));
                 }))
                 .child(html!("div", {
@@ -273,6 +273,7 @@ impl Explorer {
                 .child(html!("li", {
                     .attr("draggable", "true")
                     .event(clone!(this => move |_: events::DragEnter| {
+                        web_sys::console::log_1(&this.workspace.name.get_cloned().to_string().into());
                         this.drop_target.set(Some(this.workspace.clone()));
                     }))
                     .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
@@ -280,18 +281,16 @@ impl Explorer {
                     })
                     .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
                         event.prevent_default();
-                        if let Some(target) = this.dragged.get_cloned() {
-                            if let Some(drop_target) = this.drop_target.get_cloned() {
-                                crate::PROJECT.with(|root| {
-                                    // Remove the dragged item from its original parent
-                                    find_and_remove_from_parent(&target, root);
-                                });
-                    
-                                // Add the dragged item to the target directory
-                                match target {
-                                    Target::File(file) => drop_target.files.lock_mut().push_cloned(file),
-                                    Target::Directory(dragged_dir) => drop_target.directories.lock_mut().push_cloned(dragged_dir),
-                                }
+                        if let Some((dragged, drop_target)) = this.dragged.get_cloned().zip(this.drop_target.get_cloned()) {
+                            crate::PROJECT.with(|root| {
+                                // Remove the dragged item from its original parent
+                                find_and_remove_from_parent(&dragged, root);
+                            });
+                
+                            // Add the dragged item to the target directory
+                            match dragged {
+                                Target::File(file) => drop_target.files.lock_mut().push_cloned(file),
+                                Target::Directory(directory) => drop_target.directories.lock_mut().push_cloned(directory),
                             }
                         }
                         this.dragged.set(None);

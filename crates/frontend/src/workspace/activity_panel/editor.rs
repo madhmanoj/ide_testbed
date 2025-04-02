@@ -33,13 +33,9 @@ impl Editor {
     }
 
     pub fn render(
-        this: &Rc<Editor>,
-        // width: impl Signal<Item = u32> + 'static,
-        // height: impl Signal<Item = u32> + 'static
+        this: &Rc<Editor>
     ) -> impl Signal<Item = Option<dominator::Dom>> {
         stylesheet!(".cm-editor", {
-            // .style_signal("height", height.map(|height| format!("{height}px")))
-            // .style_signal("max-width", width.map(|width| format!("{width}px")))
             .style("height", "100%")
             .style_important("outline", "none")
         });
@@ -96,35 +92,38 @@ impl Editor {
             "state" => state,
         });
 
-        let view_clone = Rc::new(view);
-
         signal::always(Some(html!("div", {
             .class("block")
             .class("h-full")
             // to check if the file contents changed and to change the view to reflect that
-            .future(this.file.data.signal_cloned().for_each(clone!(view_clone => move |new_data| {
-                if let Ok(new_text) = String::from_utf8(new_data) {
-                    let state = view_clone.state();
-                    let current_text = state.doc().to_string();
+            .future(this.file.data.signal_cloned().for_each(clone!(view => move |new_data| {
+                match String::from_utf8(new_data) {
+                    Ok(new_text) => {
+                        let state = view.state();
+                        let current_text = state.doc().to_string();
 
-                    if current_text != new_text {
-                        let transaction = object! {
-                            "changes" => {
-                                object! {
-                                    "from" => 0,
-                                    "to" => state.doc().length(),
-                                    "insert" => new_text
+                        if current_text != new_text {
+                            let transaction = object! {
+                                "changes" => {
+                                    object! {
+                                        "from" => 0,
+                                        "to" => state.doc().length(),
+                                        "insert" => new_text
+                                    }
                                 }
-                            }
-                        };
-                        view_clone.dispatch(&transaction);
-                    }
+                            };
+                            view.dispatch(&transaction);
+                        }
+                    },
+                    Err(err) => {
+                        panic!("Not valid Unicode: {}", err);
+                    },
                 }
                 async {}
             })))
-            .after_inserted(clone!(view_clone => move |parent| {
-                parent.append_child(&view_clone.as_ref().dom()).unwrap();
-            }))
+            .after_inserted(move |parent| {
+                parent.append_child(&view.dom()).unwrap();
+            })
         })))
     }
 

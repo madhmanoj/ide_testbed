@@ -29,15 +29,10 @@ impl GridAttributes {
     }
 }
 
-// Note LayoutPanel does not impl clone since it should always be used behind an Rc
 pub enum LayoutPanel {
     HorizontalSplit {
         // | | |
         parent: Option<Rc<LayoutPanel>>,
-        // is this a good idea?
-        // these are passed down to the children as signals
-        // but the width should just be inherited from the parent??
-        //height: Mutable<u32>,
         children: MutableVec<(Rc<LayoutPanel>, Mutable<f64>)>,
     },
     VerticalSplit {
@@ -45,17 +40,11 @@ pub enum LayoutPanel {
         // _
         // _
         parent: Option<Rc<LayoutPanel>>,
-        // is this a good idea?
-        // these are passed down to the children as signals
-        // but the width should just be inherited from the parent??
-        // maybe useful for splitting the opposite way
-        //width: Mutable<u32>,
         children: MutableVec<(Rc<LayoutPanel>, Mutable<f64>)>,
     },
     Widget {
         parent: Option<Rc<LayoutPanel>>,
         activity_panel: Rc<ActivityPanel>,
-        // no height or width here since this is a leaf node
     },
 }
 
@@ -81,8 +70,6 @@ async fn redistribute((available_space, element_sizes): (f64, Vec<Mutable<f64>>)
                     current_total_size;
                 element_sizes.iter_mut().for_each(|size| **size *= scaling_factor);
             }
-            /* TODO implement a width stealing path so that no widget is less than min height/width? */
-            /* this will require overflow/scrolling the widget? */
         }
     }
 }
@@ -437,7 +424,6 @@ impl LayoutPanel {
 
     pub fn append_split_horizontal(self: &Rc<LayoutPanel>, size: f64) -> Rc<LayoutPanel> {
         match self.as_ref() {
-            // perhaps we should extend the width/height of the previous child here?
             LayoutPanel::HorizontalSplit { .. } => self.clone(),
             LayoutPanel::VerticalSplit { children, .. } => {
                 let split = Rc::new(LayoutPanel::HorizontalSplit {
@@ -461,7 +447,6 @@ impl LayoutPanel {
                 children.lock_mut().push_cloned((split.clone(), Mutable::new(size)));
                 split
             },
-            // perhaps we should extend the width/height of the previous child here?
             LayoutPanel::VerticalSplit { .. } => self.clone(),
             LayoutPanel::Widget { .. } => panic!("Cannot append a vertical split to a widget"),
         }
@@ -477,16 +462,10 @@ impl LayoutPanel {
                         Rc::ptr_eq(child, self)
                     }).unwrap();
 
-                    // Nicer new size logic
                     let mut children = children.lock_mut();
                     let (total_size, count) = children.iter()
                         .fold((0.0, 0.0), |(total_size, count), (_, size)| (total_size + size.get(), count + 1.0));
                     let new_size = total_size / count;
-
-                    // TODO the old code just discarded LayoutPanel which is fine when it is just a widget with a color
-                    // but in the real code we need to keep that LayoutPanel in the collection (since it contains state
-                    // such as open/selected tabs). The following is the equivalent of a split right, but this will
-                    // be different for split left
 
                     let active_activity = activity_panel.active_activity.get_cloned();
                     if let Some(active_activity) = active_activity {
@@ -511,11 +490,6 @@ impl LayoutPanel {
                     // if we have a valid index from the previous unwrap, there should be a corresponding size for that
                     let old_size = lock.get(index).unwrap().1.get();
 
-                    // TODO same argument as above, in principle, we want to move self into the new horizontal split
-                    // however in this case it is already done since we just move color in, but in the case of tabs in
-                    // the actual UI, the tabs should be moved into just the first child in the new split and the tab
-                    // that was actually "left splitted" should be duplicated (see how this works in VS Code)
-                    // NOTE that we cannot just clone self here since we need to change its parent to the new container
                     let active_activity = activity_panel.active_activity.get_cloned();
                     if let Some(active_activity) = active_activity {
                         let new_activity_panel = ActivityPanel::new(&active_activity);
@@ -535,8 +509,6 @@ impl LayoutPanel {
                         }
                     }
                 },
-                // It is better to explictly crash here since allowing this situation may lead to more
-                // difficult to find bugs
                 LayoutPanel::Widget { .. } => unreachable!("A widget cannot be a parent")
             }
         }
@@ -600,8 +572,6 @@ impl LayoutPanel {
                         }
                     }
                 },
-                // It is better to explictly crash here since allowing this situation may lead to more
-                // difficult to find bugs
                 LayoutPanel::Widget { .. } => unreachable!("A widget cannot be a parent")
             }
         }
