@@ -96,12 +96,35 @@ impl Editor {
             "state" => state,
         });
 
+        let view_clone = Rc::new(view);
+
         signal::always(Some(html!("div", {
             .class("block")
             .class("h-full")
-            .after_inserted(move |parent| {
-                parent.append_child(&view.dom()).unwrap();
-            })
+            // to check if the file contents changed and to change the view to reflect that
+            .future(this.file.data.signal_cloned().for_each(clone!(view_clone => move |new_data| {
+                if let Ok(new_text) = String::from_utf8(new_data) {
+                    let state = view_clone.state();
+                    let current_text = state.doc().to_string();
+
+                    if current_text != new_text {
+                        let transaction = object! {
+                            "changes" => {
+                                object! {
+                                    "from" => 0,
+                                    "to" => state.doc().length(),
+                                    "insert" => new_text
+                                }
+                            }
+                        };
+                        view_clone.dispatch(&transaction);
+                    }
+                }
+                async {}
+            })))
+            .after_inserted(clone!(view_clone => move |parent| {
+                parent.append_child(&view_clone.as_ref().dom()).unwrap();
+            }))
         })))
     }
 
