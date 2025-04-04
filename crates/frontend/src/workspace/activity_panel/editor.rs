@@ -25,7 +25,6 @@ pub struct Editor {
 }
 
 impl Editor {
-    // pass signals for saving?
     pub fn new(file: Rc<crate::vfs::File>) -> Editor {
         Editor {
             file
@@ -48,9 +47,6 @@ impl Editor {
             }
         });
 
-        // TODO: this is not necessary for the moment, but when opening the
-        // file, we are just taking a single snapshot and not updating it.
-        // This is ok since we only allow one editor per file.
         let data = String::from_utf8(this.file.data.get_cloned()).unwrap();
     
         let language = state::Compartment::new();

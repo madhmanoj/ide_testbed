@@ -1,9 +1,12 @@
 use std::rc::Rc;
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
+use futures::future::LocalBoxFuture;
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
+use js_sys::Promise;
+use wasm_bindgen_futures::JsFuture;
 
-use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::Directory};
+use crate::{contextmenu::{ContextMenu, Target}, styles::{self, panel}, vfs::Directory};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -257,6 +260,7 @@ impl Default for Explorer {
 impl Explorer {
     pub fn render(this: &Rc<Explorer>, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
         let expanded = Mutable::new(true);
+        let promise: Mutable<Option<Promise>> = Mutable::new(None);
         html!("div", {
             .class("block")
             .apply(styles::panel::body)
@@ -268,6 +272,7 @@ impl Explorer {
                     .text("Explorer")
                 }))
             }))
+            //.future()
             // project listing
             .child(html!("ul", {
                 .child(html!("li", {
@@ -291,6 +296,19 @@ impl Explorer {
                             match dragged {
                                 Target::File(file) => drop_target.files.lock_mut().push_cloned(file),
                                 Target::Directory(directory) => drop_target.directories.lock_mut().push_cloned(directory),
+                            }
+                        } else {
+                            let x = event.data_transfer();
+                            if let Some(x) = x {
+                                let future = async move {
+                                    while let Ok(i) = x.get_files() {
+                                        let f = JsFuture::from(i);
+                                        if let Ok(result) = f.await {
+                                            web_sys::console::log_1(&result);
+                                        }
+                                    }
+                                };
+                                wasm_bindgen_futures::spawn_local(future);
                             }
                         }
                         this.dragged.set(None);
