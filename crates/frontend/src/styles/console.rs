@@ -1,5 +1,5 @@
 use dominator::DomBuilder;
-use web_sys::HtmlElement;
+use web_sys::{HtmlDivElement, HtmlElement};
 
 pub fn container(
     dom_builder: DomBuilder<HtmlElement>,
@@ -21,7 +21,7 @@ pub fn title_text(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElemen
         .class("tracking-widest")
 }
 
-pub fn message_area(dom_builder: DomBuilder<HtmlElement>) -> DomBuilder<HtmlElement> {
+pub fn message_area(dom_builder: DomBuilder<HtmlDivElement>) -> DomBuilder<HtmlDivElement> {
     dom_builder
         .class("p-2")
         .style("background-color", super::FOREGROUND_COLOR)
