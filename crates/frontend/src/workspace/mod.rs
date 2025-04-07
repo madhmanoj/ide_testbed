@@ -15,7 +15,6 @@ const RESIZER_PX: u32 = 3;
 
 pub struct Workspace {
     pub activity_panels: Rc<LayoutPanel>,
-    // to know which activity panel is active for file opening
     pub active_panel: Mutable<Rc<ActivityPanel>>,
     console: Rc<console::Console>,
     pub console_height: Mutable<u32>,
@@ -40,7 +39,6 @@ impl Default for Workspace {
     }
 }
    
-// part of the problem is that I need to respond to the user moving the mouse, but also the size of the window
 impl Workspace {
     pub fn render_activity_panel(
         this: &Rc<Workspace>,
@@ -116,13 +114,20 @@ impl Workspace {
         })
     }
 
-    pub fn render_console(this: &Rc<Workspace>) -> Dom {
+    pub fn render_console(
+        this: &Rc<Workspace>,
+        console_width: impl Signal<Item = u32> + 'static
+    ) -> Dom {
+        let console_width = console_width.broadcast();
         html!("div", {
             .class("col-span-1")
             .class("row-span-1")
+            // we set both width and height since the fit addon needs to know the height of the terminal container
+            // explicitly
             .style_signal("height", this.console_height.signal().map(|height| format!("{height}px")))
-            .apply(styles::console::container)
-            .child(this.console.render())
+            .style_signal("width", console_width.signal().map(|width| format!("{width}px")))
+            // .apply(styles::console::container)
+            .child(this.console.render(console_width.signal(), this.console_height.signal()))
         })
     }
 }

@@ -62,7 +62,7 @@ pub async fn main() {
 
     let workspace_width = map_ref!(window_width, sidebar_width => {
         window_width.saturating_sub(*sidebar_width)
-    });
+    }).broadcast();
 
     let console_height = workspace.console_height.signal();
     let activity_panel_height = 
@@ -108,11 +108,11 @@ pub async fn main() {
 
         .child_signal(Sidebar::render_vertical_resizer(&sidebar, global_cols.clone()))
 
-        .child(Workspace::render_activity_panel(&workspace, workspace_width, activity_panel_height))
+        .child(Workspace::render_activity_panel(&workspace, workspace_width.signal(), activity_panel_height))
 
         .child(Workspace::render_horizontal_resizer(&workspace))
 
-        .child(Workspace::render_console(&workspace))
+        .child(Workspace::render_console(&workspace, workspace_width.signal()))
     });
 
     dominator::append_dom(&dominator::body(), outer);
