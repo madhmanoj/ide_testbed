@@ -39,4 +39,4 @@ USER developer
 # install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --target wasm32-unknown-unknown
 ENV PATH=/home/developer/.cargo/bin:$PATH
-RUN cargo install --git https://github.com/rustwasm/wasm-bindgen.git  --tag 0.2.91 wasm-bindgen-cli
+RUN cargo install --git https://github.com/rustwasm/wasm-bindgen.git  --tag 0.2.100 wasm-bindgen-cli

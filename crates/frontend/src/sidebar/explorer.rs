@@ -1,12 +1,14 @@
-use std::rc::Rc;
+use std::{future::Future, rc::Rc};
 
 use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions, with_node};
-use futures::future::LocalBoxFuture;
+use either::Either;
+use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
-use js_sys::Promise;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
+use web_sys::{FileSystemDirectoryHandle, FileSystemFileHandle, FileSystemHandle, FileSystemHandleKind};
 
-use crate::{contextmenu::{ContextMenu, Target}, styles::{self, panel}, vfs::Directory};
+use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::{self, Directory}};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -257,10 +259,45 @@ impl Default for Explorer {
     }
 }
 
+use util::StreamTools;
+
+fn handle_drop(
+    event: events::Drop
+) -> impl Future<Output = (Vec<vfs::File>, Vec<vfs::Directory>)> {
+    event.prevent_default();
+    event.data_transfer()
+        .into_iter()
+        .flat_map(|transfer| {
+            let items = transfer.items();
+            (0..items.length()).flat_map(move |index| items.get(index).into_iter())
+        })
+        .filter_map(|item| match item.kind().as_ref() {
+            "file" => JsFuture::from(item.get_as_file_system_handle()).into(),
+            _ => None
+        })
+        .collect::<FuturesUnordered<_>>()
+        .filter_map(|handle| async {
+            // this currently throws away errors
+            let handle = handle.ok()?
+                .unchecked_into::<FileSystemHandle>();
+            match handle.kind() {
+                FileSystemHandleKind::File =>
+                    vfs::File::from_handle(handle.unchecked_ref::<FileSystemFileHandle>())
+                        .map(Either::Left)
+                        .map(Some).await,
+                FileSystemHandleKind::Directory =>
+                    vfs::Directory::from_handle(handle.unchecked_ref::<FileSystemDirectoryHandle>())
+                        .map(Either::Right)
+                        .map(Some).await,
+                _ => unreachable!()
+            }
+        })
+        .partition_map(|entry| entry)
+}
+
 impl Explorer {
     pub fn render(this: &Rc<Explorer>, workspace_command_tx: &crate::WorkspaceCommandSender) -> dominator::Dom {
         let expanded = Mutable::new(true);
-        let promise: Mutable<Option<Promise>> = Mutable::new(None);
         html!("div", {
             .class("block")
             .apply(styles::panel::body)
@@ -285,37 +322,16 @@ impl Explorer {
                         event.prevent_default(); // Allow drop
                     })
                     .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
-                        event.prevent_default();
-                        if let Some((dragged, drop_target)) = this.dragged.get_cloned().zip(this.drop_target.get_cloned()) {
-                            crate::PROJECT.with(|root| {
-                                // Remove the dragged item from its original parent
-                                find_and_remove_from_parent(&dragged, root);
-                            });
-                
-                            // Add the dragged item to the target directory
-                            match dragged {
-                                Target::File(file) => drop_target.files.lock_mut().push_cloned(file),
-                                Target::Directory(directory) => drop_target.directories.lock_mut().push_cloned(directory),
-                            }
-                        } else {
-                            let x = event.data_transfer();
-                            if let Some(x) = x {
-                                let future = async move {
-                                    while let Ok(i) = x.get_files() {
-                                        let f = JsFuture::from(i);
-                                        if let Ok(result) = f.await {
-                                            web_sys::console::log_1(&result);
-                                        }
-                                    }
-                                };
-                                wasm_bindgen_futures::spawn_local(future);
-                            }
-                        }
-                        this.dragged.set(None);
-                        this.drop_target.set(None);
-                    }))
-                    .event(clone!(this => move |_: events::DragEnd| {
-                        this.dragged.set(None);
+                        wasm_bindgen_futures::spawn_local(clone!(this => async move {
+                            let (dropped_files, dropped_directories) = handle_drop(event).await;
+                            // NOTE: Never hold a lock across an await point
+                            let mut directories = this.workspace.directories.lock_mut();
+                            let mut files = this.workspace.files.lock_mut();
+                            dropped_files.into_iter()
+                                .for_each(|file| files.push_cloned(file.into()));
+                            dropped_directories.into_iter()
+                                .for_each(|directory| directories.push_cloned(directory.into()));
+                        }));
                     }))
                     .child(html!("div", {
                         .apply(styles::vfs_item::body)
