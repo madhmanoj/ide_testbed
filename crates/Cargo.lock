@@ -116,9 +116,9 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
 name = "dominator"
-version = "0.5.37"
+version = "0.5.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "763ad909c52fb5dc28e4301b35e7c6f4e018e08a207a58974578cdf163d7b929"
+checksum = "40348e50c3b38c0d76bc116e7e02eb98ef5dd3536d79d9411acb07663f10ec9d"
 dependencies = [
  "discard",
  "futures-channel",
@@ -163,7 +163,6 @@ dependencies = [
  "tracing-subscriber",
  "tracing-web",
  "util",
- "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

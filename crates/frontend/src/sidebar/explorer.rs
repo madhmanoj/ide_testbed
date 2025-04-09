@@ -53,51 +53,24 @@ fn file_icon() -> Dom {
     })
 }
 
-fn find_and_remove_from_parent(target: &Target, root: &Rc<Directory>) {
-    match target {
-        Target::File(file) => {
-            // Search for the parent directory containing the file
-            let mut files = root.files.lock_mut();
-            if let Some(pos) = files.iter().position(|f| Rc::ptr_eq(f, file)) {
-                files.remove(pos); // Remove the file
-                return;
-            }
-        }
-        Target::Directory(dragged_dir) => {
-            // Search for the parent directory containing the directory
-            let mut directories = root.directories.lock_mut();
-            if let Some(pos) = directories.iter().position(|d| Rc::ptr_eq(d, dragged_dir)) {
-                directories.remove(pos); // Remove the directory
-                return;
-            }
-        }
-    }
-
-    // Recursively search child directories
-    for child in root.directories.lock_ref().iter() {
-        find_and_remove_from_parent(target, child);
-    }
-}
-
 fn render_contents(
     explorer: &Rc<Explorer>,
-    directory: &Rc<Directory>,
+    parent_directory: &Rc<Directory>,
     workspace_command_tx: &crate::WorkspaceCommandSender
 ) -> Dom {
-    let directories = directory.directories
+    let directories = parent_directory.directories
         .signal_vec_cloned()
         .sort_by_cloned(|left_directory, right_directory|
             left_directory.name.lock_ref().cmp(&*right_directory.name.lock_ref()))
-        .map(clone!(workspace_command_tx, explorer => move |directory| {
+        .map(clone!(workspace_command_tx, explorer, parent_directory => move |directory| {
             let expanded = Mutable::new(true);
             html!("li", {
                 .apply(styles::vfs_item::list)
                 .attr("draggable", "true")
-                .event(clone!(directory, explorer => move |_: events::DragStart| {
-                    explorer.dragged.set(Some(Target::Directory(directory.clone())));
+                .event(clone!(directory, explorer, parent_directory => move |_: events::DragStart| {
+                    explorer.drag_object.set(Some((Target::Directory(directory.clone()), parent_directory.clone())));
                 }))
                 .event(clone!(directory, explorer => move |_: events::DragEnter| {
-                    web_sys::console::log_1(&directory.name.get_cloned().to_string().into());
                     explorer.drop_target.set(Some(directory.clone()));
                 }))
                 .child(html!("div", {
@@ -164,15 +137,15 @@ fn render_contents(
             })
         }));
 
-    let files = directory.files
+    let files = parent_directory.files
         .signal_vec_cloned()
         .sort_by_cloned(|left_file, right_file|
             left_file.name.lock_ref().cmp(&*right_file.name.lock_ref()))
-        .map(clone!(workspace_command_tx, explorer => move |file| html!("li", {
+        .map(clone!(workspace_command_tx, parent_directory, explorer => move |file| html!("li", {
             .apply(styles::vfs_item::list)
             .attr("draggable", "true")
-            .event(clone!(file, explorer => move |_: events::DragStart| {
-                explorer.dragged.set(Some(Target::File(file.clone())));
+            .event(clone!(file, explorer, parent_directory => move |_: events::DragStart| {
+                explorer.drag_object.set(Some((Target::File(file.clone()), parent_directory.clone())));
             }))
             .child(html!("div", {
                 .apply(styles::vfs_item::body)
@@ -240,9 +213,9 @@ fn render_contents(
 
 pub struct Explorer {
     workspace: Rc<Directory>,
-    // context menu
     context_menu: Mutable<Option<ContextMenu>>,
-    dragged: Mutable<Option<Target>>,
+    // (dragged_object, dragged_object_parent)
+    drag_object: Mutable<Option<(Target, Rc<Directory>)>>,
     rename: Mutable<Option<Target>>,
     drop_target: Mutable<Option<Rc<Directory>>>
 }
@@ -252,7 +225,7 @@ impl Default for Explorer {
         Self {
             workspace: crate::PROJECT.with(|workspace| Rc::clone(workspace)),
             context_menu: Mutable::new(None),
-            dragged: Mutable::new(None),
+            drag_object: Mutable::new(None),
             rename: Mutable::new(None),
             drop_target: Mutable::new(None)
         }
@@ -309,28 +282,49 @@ impl Explorer {
                     .text("Explorer")
                 }))
             }))
-            //.future()
             // project listing
             .child(html!("ul", {
                 .child(html!("li", {
                     .attr("draggable", "true")
                     .event(clone!(this => move |_: events::DragEnter| {
-                        web_sys::console::log_1(&this.workspace.name.get_cloned().to_string().into());
                         this.drop_target.set(Some(this.workspace.clone()));
                     }))
                     .event_with_options(&EventOptions::preventable(), |event: events::DragOver| {
                         event.prevent_default(); // Allow drop
                     })
                     .event_with_options(&EventOptions::preventable(), clone!(this => move |event: events::Drop| {
+                        if let Some(((drag_target, drag_parent), drop_target)) = this.drag_object.get_cloned().zip(this.drop_target.get_cloned()) {
+                            match drag_target {
+                                Target::File(file) => {
+                                    let mut files = drag_parent.files.lock_mut();
+                                    // unwrapping is safe since we expect the drag_target to be in its parent
+                                    let index = files.iter().position(|f| Rc::ptr_eq(f, &file)).unwrap();
+                                    let file = files.get(index).unwrap().clone();
+                                    files.remove(index);
+                                    drop_target.files.lock_mut().push_cloned(file);
+                                },
+                                Target::Directory(directory) => {
+                                    let mut directories = drag_parent.directories.lock_mut();
+                                    // unwrapping is safe since we expect the drag_target to be in its parent
+                                    let index = directories.iter().position(|f| Rc::ptr_eq(f, &directory)).unwrap();
+                                    let directory = directories.get(index).unwrap().clone();
+                                    directories.remove(index);
+                                    drop_target.directories.lock_mut().push_cloned(directory);
+                                },
+                            }
+                        }
                         wasm_bindgen_futures::spawn_local(clone!(this => async move {
                             let (dropped_files, dropped_directories) = handle_drop(event).await;
                             // NOTE: Never hold a lock across an await point
-                            let mut directories = this.workspace.directories.lock_mut();
-                            let mut files = this.workspace.files.lock_mut();
-                            dropped_files.into_iter()
-                                .for_each(|file| files.push_cloned(file.into()));
-                            dropped_directories.into_iter()
-                                .for_each(|directory| directories.push_cloned(directory.into()));
+                            if let Some(drop_target) = this.drop_target.get_cloned() {
+                                let mut directories = drop_target.directories.lock_mut();
+                                let mut files = drop_target.files.lock_mut();
+                                dropped_files.into_iter()
+                                    .for_each(|file| files.push_cloned(file.into()));
+                                dropped_directories.into_iter()
+                                    .for_each(|directory| directories.push_cloned(directory.into()));
+                            }
+                            
                         }));
                     }))
                     .child(html!("div", {

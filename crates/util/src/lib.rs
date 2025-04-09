@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use futures::Stream;
 
 mod partition;
