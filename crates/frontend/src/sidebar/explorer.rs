@@ -312,20 +312,20 @@ impl Explorer {
                                     drop_target.directories.lock_mut().push_cloned(directory);
                                 },
                             }
+                        } else {
+                            wasm_bindgen_futures::spawn_local(clone!(this => async move {
+                                let (dropped_files, dropped_directories) = handle_drop(event).await;
+                                // NOTE: Never hold a lock across an await point
+                                if let Some(drop_target) = this.drop_target.get_cloned() {
+                                    let mut directories = drop_target.directories.lock_mut();
+                                    let mut files = drop_target.files.lock_mut();
+                                    dropped_files.into_iter()
+                                        .for_each(|file| files.push_cloned(file.into()));
+                                    dropped_directories.into_iter()
+                                        .for_each(|directory| directories.push_cloned(directory.into()));
+                                }
+                            }));
                         }
-                        wasm_bindgen_futures::spawn_local(clone!(this => async move {
-                            let (dropped_files, dropped_directories) = handle_drop(event).await;
-                            // NOTE: Never hold a lock across an await point
-                            if let Some(drop_target) = this.drop_target.get_cloned() {
-                                let mut directories = drop_target.directories.lock_mut();
-                                let mut files = drop_target.files.lock_mut();
-                                dropped_files.into_iter()
-                                    .for_each(|file| files.push_cloned(file.into()));
-                                dropped_directories.into_iter()
-                                    .for_each(|directory| directories.push_cloned(directory.into()));
-                            }
-                            
-                        }));
                     }))
                     .child(html!("div", {
                         .apply(styles::vfs_item::body)

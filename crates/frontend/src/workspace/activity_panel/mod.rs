@@ -23,16 +23,21 @@ pub enum Activity {
 }
 
 impl Activity {
+    /*
+    ISSUE (Rust 2024):
+    lifetime may not live long enough
+    returning this value requires that `'1` must outlive `'static`
+    mod.rs(27, 15): let's call the lifetime of this reference `'1`
+    mod.rs(28, 59): to declare that the trait object captures data from argument `this`, you can add an explicit `'_` lifetime bound: ` + '_`
+    */
     pub fn render(
         this: &Rc<Activity>,
-        // width: impl Signal<Item = u32> + 'static,
-        // height: impl Signal<Item = u32> + 'static
     ) -> Pin<Box<dyn Signal<Item = Option<dominator::Dom>>>> {
         match this.as_ref() {
             Activity::Editor(editor) => Box::pin(editor::Editor::render(editor)),
             Activity::Welcome(welcome) => Box::pin(welcome::Welcome::render(welcome)),
         }
-    }
+    }    
 
     pub fn label(&self) -> Dom {
         match self {
@@ -306,9 +311,7 @@ impl ActivityPanel {
                     .map(|activity| html!("div", {
                         .class("h-full")
                         .child_signal(Activity::render(
-                            &activity,
-                            // width.signal(),
-                            // height.signal_ref(|height| height.saturating_sub(TAB_HEIGHT + 17))
+                            &activity
                         ))
                     }))
                 )
