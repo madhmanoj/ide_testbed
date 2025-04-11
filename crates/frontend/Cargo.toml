@@ -36,4 +36,4 @@ wasm-bindgen = "=0.2.100"
 wasm-bindgen-futures = "0.4.50"
 [dependencies.web-sys]
 version = "0.3.77"
-features = ["HtmlHtmlElement", "File", "FileSystemHandle", "FileSystemDirectoryHandle", "FileSystemFileHandle", "FileSystemHandleKind", "DataTransferItemList", "DataTransferItem"]
+features = ["HtmlHtmlElement", "DomException", "File", "FileSystemHandle", "FileSystemDirectoryHandle", "FileSystemFileHandle", "FileSystemHandleKind", "DataTransferItemList", "DataTransferItem"]
