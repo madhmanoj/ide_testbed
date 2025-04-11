@@ -1,12 +1,12 @@
-use std::rc::Rc;
+use std::{f64::consts::E, rc::Rc};
 
 use dominator::clone;
 use either::Either;
-use futures::{channel::oneshot, stream::{FuturesUnordered, StreamExt}, FutureExt};
+use futures::{channel::mpsc, stream::{FuturesUnordered, StreamExt}, FutureExt};
 use futures_signals::{signal::Mutable, signal_vec::MutableVec};
 use js_sys::{ArrayBuffer, Uint8Array};
 use util::StreamTools;
-use wasm_bindgen::{prelude::Closure, JsCast};
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::FileSystemHandle;
 
@@ -22,32 +22,40 @@ impl File {
     // insufficient permissions, timeouts. etc). If any of these fails the
     // whole drop operation should probably be cancelled and a error message
     // somehow displayed to the user
-    pub async fn from_handle(file: &web_sys::FileSystemFileHandle) -> File {
+    pub async fn from_handle(file: &web_sys::FileSystemFileHandle) -> Result<File, JsValue> {
         match JsFuture::from(file.get_file()).await {
             Ok(file) => {
                 let file = file.unchecked_into::<web_sys::File>();
                 let reader = web_sys::FileReader::new().unwrap();
-                let (tx, rx) = oneshot::channel();
-                let onload = Closure::once(clone!(reader => move || {
-                    tx.send(reader.result()).unwrap();
+                let (tx, mut rx) = mpsc::unbounded();
+                let onload = Closure::once(clone!(reader, tx => move || {
+                    tx.unbounded_send(Ok(reader.result().unwrap())).unwrap();
                 }));
                 reader.set_onload(Some(onload.as_ref().unchecked_ref()));
-                // start reading
-                // TODO improve error handling
+                let onerror = Closure::once(clone!(reader, tx => move || {
+                    tx.unbounded_send(Err(reader.error().unwrap())).unwrap();
+                }));
+                reader.set_onerror(Some(onerror.as_ref().unchecked_ref()));
                 tracing::info!("reading file {}", file.name());
                 reader.read_as_array_buffer(&file).unwrap();
-                // wait for read to complete
-                // TODO improve error handling
-                let buffer = rx.await.unwrap().unwrap()
-                    .unchecked_into::<ArrayBuffer>();
-                tracing::info!("reading file {} done", file.name());
-                File {
-                    name: Mutable::new(file.name()),
-                    mode: Mutable::new(0o644),
-                    data: Mutable::new(Uint8Array::new(&buffer).to_vec()),
+                match rx.select_next_some().await {
+                    Ok(buffer) => {
+                        tracing::info!("reading file {} done", file.name());
+                        let buffer = buffer.unchecked_into::<ArrayBuffer>();
+                        Ok(File {
+                            name: Mutable::new(file.name()),
+                            mode: Mutable::new(0o644),
+                            data: Mutable::new(Uint8Array::new(&buffer).to_vec()),
+                        })
+                    }, 
+                    Err(err) => {
+                        // (Error Name: Error Message) format
+                        let error_log = format!("{}: {}", err.name(), err.message());
+                        Err(JsValue::from_str(&error_log))
+                    }
                 }
             }
-            Err(_) => unimplemented!("error handling")
+            Err(err) => Err(err)
         }
     }
 }
@@ -61,7 +69,7 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub async fn from_handle(directory: &web_sys::FileSystemDirectoryHandle) -> Directory {
+    pub async fn from_handle(directory: &web_sys::FileSystemDirectoryHandle) -> Result<Directory, JsValue> {
         let entries = directory.values();
         let handles = FuturesUnordered::new();
         while let Ok(entry) = entries.next() {
