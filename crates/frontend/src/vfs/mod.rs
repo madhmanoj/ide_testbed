@@ -4,6 +4,7 @@ use dominator::clone;
 use either::Either;
 use futures::{channel::mpsc, stream::{FuturesUnordered, StreamExt}, FutureExt};
 use futures_signals::{signal::Mutable, signal_vec::MutableVec};
+use itertools::Itertools;
 use js_sys::{ArrayBuffer, Uint8Array};
 use util::StreamTools;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
@@ -50,8 +51,11 @@ impl File {
                     }, 
                     Err(err) => {
                         // (Error Name: Error Message) format
-                        let error_log = format!("{}: {}", err.name(), err.message());
-                        Err(JsValue::from_str(&error_log))
+                        
+                        // let error_log = format!("{}: {}", err.name(), err.message());
+                        // Err(JsValue::from_str(&error_log))
+
+                        Err(err.into())
                     }
                 }
             }
@@ -83,31 +87,40 @@ impl Directory {
                 handles.push(async { handle });
             }
         }
-        let (files, subdirectories): (Vec<Rc<File>>, Vec<Rc<Directory>>) = handles
+
+        let entries: Vec<Either<Result<File, JsValue>, Result<Directory, JsValue>>> = handles
             .filter_map(|handle| async move {
                 match handle.kind() {
                     web_sys::FileSystemHandleKind::File =>
                         File::from_handle(handle.unchecked_ref::<web_sys::FileSystemFileHandle>())
-                            .map(Rc::from)
                             .map(Either::Left)
                             .map(Some).await,
                     web_sys::FileSystemHandleKind::Directory =>
                         Directory::from_handle(handle.unchecked_ref::<web_sys::FileSystemDirectoryHandle>())
                             .boxed_local()
-                            .map(Rc::from)
                             .map(Either::Right)
                             .map(Some).await,
                     _ => unreachable!(),
                 }
             })
-            .partition_map(|handle| handle).await;
+            .collect::<Vec<_>>().await;
+        
+        let mut files = Vec::new();
+        let mut subdirectories = Vec::new();
 
-        Directory {
+        for entry in entries {
+            match entry {
+                Either::Left(file) => files.push(Rc::new(file?)),
+                Either::Right(directory) => subdirectories.push(Rc::new(directory?)),
+            }
+        }
+
+        Ok(Directory {
             name: Mutable::new(directory.name()),
             mode: Mutable::new(0o755),
             directories: MutableVec::new_with_values(subdirectories),
             files: MutableVec::new_with_values(files),
-        }
+        })
     }
 }
 
