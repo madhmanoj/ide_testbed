@@ -18,8 +18,10 @@ pub trait StreamTools: Stream {
     where
         Self: Sized,
         F: FnMut(Self::Item) -> either::Either<L, R>,
-        A: Default + Extend<L>,
-        B: Default + Extend<R> {
+        A: FromIterator<L>,
+        B: FromIterator<R>,
+        L: 'static,
+        R: 'static {
         assert_future::<(A, B), _>(partition_map::PartitionMap::new(self, predicate))
     }
 }

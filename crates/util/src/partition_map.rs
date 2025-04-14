@@ -10,33 +10,38 @@ use either::Either;
 
 pin_project! {
     /// Future for the [`partition_map`](super::StreamTools::partition_map) method.
-    #[derive(Debug)]
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct PartitionMap<St, A, B, F, L, R> {
         #[pin]
         stream: St,
-        left_collection: A,
-        right_collection: B,
+        left_iterator: Box<dyn Iterator<Item = L>>,
+        right_iterator: Box<dyn Iterator<Item = R>>,
         predicate: F,
-        left_type: PhantomData<L>,
-        right_type: PhantomData<R>
+        left_collection_type: PhantomData<A>,
+        right_collection_type: PhantomData<B>
     }
 }
 
-impl<St: Stream, A: Default, B: Default, F, L, R> PartitionMap<St, A, B, F, L, R> {
+impl<St: Stream, A: FromIterator<L>, B: FromIterator<R>, F, L: 'static, R: 'static> PartitionMap<St, A, B, F, L, R> {
     fn finish(self: Pin<&mut Self>) -> (A, B) {
         let projected = self.project();
-        (mem::take(projected.left_collection), mem::take(projected.right_collection))
+        
+        let left_collection =
+            A::from_iter(mem::replace(projected.left_iterator, Box::new(std::iter::empty())));
+        let right_collection =
+            B::from_iter(mem::replace(projected.right_iterator, Box::new(std::iter::empty())));
+
+        (left_collection, right_collection)
     }
 
     pub(super) fn new(stream: St, predicate: F) -> Self {
         Self {
             stream,
             predicate,
-            left_collection: Default::default(),
-            right_collection:  Default::default(),
-            left_type: Default::default(),
-            right_type: Default::default()
+            left_iterator: Box::new(std::iter::empty()),
+            right_iterator:  Box::new(std::iter::empty()),
+            left_collection_type: Default::default(),
+            right_collection_type: Default::default()
         }
     }
 }
@@ -45,8 +50,10 @@ impl<St, A, B, F, L, R> FusedFuture for PartitionMap<St, A, B, F, L, R>
 where
     St: FusedStream,
     F: FnMut(St::Item) -> Either<L, R>,
-    A: Default + Extend<L>,
-    B: Default + Extend<R>,
+    A: FromIterator<L>,
+    B: FromIterator<R>,
+    L: 'static,
+    R: 'static
 {
     fn is_terminated(&self) -> bool {
         self.stream.is_terminated()
@@ -57,8 +64,10 @@ impl<St, A, B, F, L, R> Future for PartitionMap<St, A, B, F, L, R>
 where
     St: Stream,
     F: FnMut(St::Item) -> Either<L, R>,
-    A: Default + Extend<L>,
-    B: Default + Extend<R>,
+    A: FromIterator<L>,
+    B: FromIterator<R>,
+    L: 'static,
+    R: 'static
 {
     type Output = (A, B);
 
@@ -67,8 +76,14 @@ where
         loop {
             match ready!(this.stream.as_mut().poll_next(cx)) {
                 Some(e) => match (this.predicate)(e) {
-                    Either::Left(e) => this.left_collection.extend(Some(e)),
-                    Either::Right(e) => this.right_collection.extend(Some(e)),
+                    Either::Left(e) => {
+                        let left_iterator = mem::replace(this.left_iterator, Box::new(std::iter::empty()));
+                        *this.left_iterator = Box::new(left_iterator.chain(Some(e)))
+                    },
+                    Either::Right(e) => {
+                        let right_iterator = mem::replace(this.right_iterator, Box::new(std::iter::empty()));
+                        *this.right_iterator = Box::new(right_iterator.chain(Some(e)))
+                    }
                 }
                 None => return Poll::Ready(self.finish()),
             }
