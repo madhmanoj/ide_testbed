@@ -4,7 +4,7 @@ use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions
 use either::Either;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{FileSystemDirectoryHandle, FileSystemFileHandle, FileSystemHandle, FileSystemHandleKind};
 
@@ -236,7 +236,7 @@ use util::StreamTools;
 
 fn handle_drop(
     event: events::Drop
-) -> impl Future<Output = (Vec<vfs::File>, Vec<vfs::Directory>)> {
+) -> impl Future<Output = (Result<Vec<vfs::File>, JsValue>, Result<Vec<vfs::Directory>, JsValue>)> {
     event.prevent_default();
     event.data_transfer()
         .into_iter()
@@ -319,6 +319,8 @@ impl Explorer {
                                 if let Some(drop_target) = this.drop_target.get_cloned() {
                                     let mut directories = drop_target.directories.lock_mut();
                                     let mut files = drop_target.files.lock_mut();
+                                    // TODO if there is an error with either files or dirs, we should
+                                    // abort the operation and inform the user with a pop-up
                                     dropped_files.into_iter()
                                         .for_each(|file| files.push_cloned(file.into()));
                                     dropped_directories.into_iter()
