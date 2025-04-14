@@ -14,8 +14,8 @@ pin_project! {
     pub struct PartitionMap<St, A, B, F, L, R> {
         #[pin]
         stream: St,
-        left_iterator: Box<dyn Iterator<Item = L>>,
-        right_iterator: Box<dyn Iterator<Item = R>>,
+        left_iterator: Option<Box<dyn Iterator<Item = L>>>,
+        right_iterator: Option<Box<dyn Iterator<Item = R>>>,
         predicate: F,
         left_collection_type: PhantomData<A>,
         right_collection_type: PhantomData<B>
@@ -27,9 +27,9 @@ impl<St: Stream, A: FromIterator<L>, B: FromIterator<R>, F, L: 'static, R: 'stat
         let projected = self.project();
         
         let left_collection =
-            A::from_iter(mem::replace(projected.left_iterator, Box::new(std::iter::empty())));
+            A::from_iter(mem::take(projected.left_iterator).into_iter().flatten());
         let right_collection =
-            B::from_iter(mem::replace(projected.right_iterator, Box::new(std::iter::empty())));
+            B::from_iter(mem::take(projected.right_iterator).into_iter().flatten());
 
         (left_collection, right_collection)
     }
@@ -38,8 +38,8 @@ impl<St: Stream, A: FromIterator<L>, B: FromIterator<R>, F, L: 'static, R: 'stat
         Self {
             stream,
             predicate,
-            left_iterator: Box::new(std::iter::empty()),
-            right_iterator:  Box::new(std::iter::empty()),
+            left_iterator: None,
+            right_iterator:  None,
             left_collection_type: Default::default(),
             right_collection_type: Default::default()
         }
@@ -77,12 +77,16 @@ where
             match ready!(this.stream.as_mut().poll_next(cx)) {
                 Some(e) => match (this.predicate)(e) {
                     Either::Left(e) => {
-                        let left_iterator = mem::replace(this.left_iterator, Box::new(std::iter::empty()));
-                        *this.left_iterator = Box::new(left_iterator.chain(Some(e)))
+                        *this.left_iterator = match mem::take(this.left_iterator) {
+                            Some(iterator) => Some(Box::new(iterator.chain(Some(e)))),
+                            _ => Some(Box::new(std::iter::once(e)))
+                        };
                     },
                     Either::Right(e) => {
-                        let right_iterator = mem::replace(this.right_iterator, Box::new(std::iter::empty()));
-                        *this.right_iterator = Box::new(right_iterator.chain(Some(e)))
+                        *this.right_iterator = match mem::take(this.right_iterator) {
+                            Some(iterator) => Some(Box::new(iterator.chain(Some(e)))),
+                            _ => Some(Box::new(std::iter::once(e)))
+                        };
                     }
                 }
                 None => return Poll::Ready(self.finish()),
