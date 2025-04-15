@@ -8,7 +8,7 @@ use js_sys::{ArrayBuffer, Uint8Array};
 use util::StreamTools;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::FileSystemHandle;
+use web_sys::{DomException, FileSystemHandle};
 
 #[derive(Clone)]
 pub struct File {
@@ -49,11 +49,6 @@ impl File {
                         })
                     }, 
                     Err(err) => {
-                        // (Error Name: Error Message) format
-                        
-                        // let error_log = format!("{}: {}", err.name(), err.message());
-                        // Err(JsValue::from_str(&error_log))
-
                         Err(err.into())
                     }
                 }
@@ -114,3 +109,7 @@ impl Directory {
     }
 }
 
+pub enum IoError {
+    ReadError(JsValue),
+    FileReaderError(DomException)
+}

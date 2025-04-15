@@ -250,7 +250,6 @@ fn handle_drop(
         })
         .collect::<FuturesUnordered<_>>()
         .filter_map(|handle| async {
-            // this currently throws away errors
             let handle = handle.ok()?
                 .unchecked_into::<FileSystemHandle>();
             match handle.kind() {
@@ -321,10 +320,21 @@ impl Explorer {
                                     let mut files = drop_target.files.lock_mut();
                                     // TODO if there is an error with either files or dirs, we should
                                     // abort the operation and inform the user with a pop-up
-                                    dropped_files.into_iter()
-                                        .for_each(|file| files.push_cloned(file.into()));
-                                    dropped_directories.into_iter()
-                                        .for_each(|directory| directories.push_cloned(directory.into()));
+                                    match (dropped_directories, dropped_files) {
+                                        (Ok(dropped_directories), Ok(dropped_files)) => {
+                                            dropped_directories.into_iter().for_each(|dir| directories.push_cloned(Rc::new(dir)));
+                                            dropped_files.into_iter().for_each(|file| files.push_cloned(Rc::new(file)));
+                                        },
+                                        (Ok(_), Err(err)) => {
+                                            web_sys::console::log_1(&"File Error".into());
+                                        },
+                                        (Err(err), Ok(_)) => {
+                                            web_sys::console::log_1(&"Directory Error".into());
+                                        },
+                                        (Err(err_1), Err(err_2)) => {
+                                            web_sys::console::log_1(&"Both Error".into());
+                                        },
+                                    };
                                 }
                             }));
                         }
