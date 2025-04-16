@@ -47,8 +47,6 @@ impl Editor {
             }
         });
 
-        let x = &language::DEFAULT_HIGHLIGHT_STYLE.with(|style| style.clone());
-
         let data = String::from_utf8(this.file.data.get_cloned()).unwrap();
     
         let language = state::Compartment::new();
@@ -63,7 +61,7 @@ impl Editor {
                 view::draw_selection(),
                 view::drop_cursor(),
                 language::indent_on_input(),
-                language::syntax_highlighting(x, None),
+                language::syntax_highlighting(&language::DEFAULT_HIGHLIGHT_STYLE.with(|style| style.clone()), None),
                 language::bracket_matching(),
                 autocomplete::close_brackets(),
                 autocomplete::autocompletion(),
@@ -72,16 +70,14 @@ impl Editor {
                 view::highlight_active_line(),
                 search::highlight_selection_matches(),
                 view::KEYMAP.with(|keymap| keymap.of(&js_sys::Array::new()
-                    .concat(&autocomplete::CLOSE_BRACKETS_KEYMAP.with(|option| option))
-                )),
-                // view::KEYMAP.of(&js_sys::Array::new()
-                //     .concat(&autocomplete::CLOSE_BRACKETS_KEYMAP)
-                //     .concat(&commands::DEFAULT_KEYMAP)
-                //     .concat(&search::SEARCH_KEYMAP)
-                //     .concat(&commands::HISTORY_KEYMAP)
-                //     .concat(&language::FOLD_KEYMAP)
-                //     .concat(&autocomplete::COMPLETION_KEYMAP)
-                //     .concat(&js_sys::Array::of1(&commands::IDENT_WITH_TAB))),
+                    .concat(&autocomplete::CLOSE_BRACKETS_KEYMAP.with(|keymap_option| keymap_option.clone()))
+                    .concat(&commands::DEFAULT_KEYMAP.with(|keymap_option| keymap_option.clone()))
+                    .concat(&search::SEARCH_KEYMAP.with(|keymap_option| keymap_option.clone()))
+                    .concat(&commands::HISTORY_KEYMAP.with(|keymap_option| keymap_option.clone()))
+                    .concat(&language::FOLD_KEYMAP.with(|keymap_option| keymap_option.clone()))
+                    .concat(&autocomplete::COMPLETION_KEYMAP.with(|keymap_option| keymap_option.clone()))
+                    .concat(&js_sys::Array::of1(&commands::IDENT_WITH_TAB.with(|keymap_option| keymap_option.clone())))),
+                ),
                 view::EditorView::update_listener()
                     .of(&Closure::<dyn Fn(_)>::new(update_closure).into_js_value()),
                 /* dynamic options */

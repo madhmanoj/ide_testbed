@@ -4,11 +4,11 @@ use dominator::{clone, events::{self, MouseButton}, html, svg, Dom, EventOptions
 use either::Either;
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{FileSystemDirectoryHandle, FileSystemFileHandle, FileSystemHandle, FileSystemHandleKind};
 
-use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::{self, Directory}};
+use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::{self, Directory, IoError}};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -236,7 +236,7 @@ use util::StreamTools;
 
 fn handle_drop(
     event: events::Drop
-) -> impl Future<Output = (Result<Vec<vfs::File>, JsValue>, Result<Vec<vfs::Directory>, JsValue>)> {
+) -> impl Future<Output = (Result<Vec<vfs::File>, IoError>, Result<Vec<vfs::Directory>, IoError>)> {
     event.prevent_default();
     event.data_transfer()
         .into_iter()
@@ -314,25 +314,28 @@ impl Explorer {
                         } else {
                             wasm_bindgen_futures::spawn_local(clone!(this => async move {
                                 let (dropped_files, dropped_directories) = handle_drop(event).await;
-                                // NOTE: Never hold a lock across an await point
                                 if let Some(drop_target) = this.drop_target.get_cloned() {
                                     let mut directories = drop_target.directories.lock_mut();
                                     let mut files = drop_target.files.lock_mut();
-                                    // TODO if there is an error with either files or dirs, we should
-                                    // abort the operation and inform the user with a pop-up
                                     match (dropped_directories, dropped_files) {
                                         (Ok(dropped_directories), Ok(dropped_files)) => {
                                             dropped_directories.into_iter().for_each(|dir| directories.push_cloned(Rc::new(dir)));
                                             dropped_files.into_iter().for_each(|file| files.push_cloned(Rc::new(file)));
                                         },
+                                        // temporary solution till we implement the overlay to show the UI
                                         (Ok(_), Err(err)) => {
-                                            web_sys::console::log_1(&"File Error".into());
+                                            let IoError::ReadError(err) = err;
+                                            web_sys::console::log_1(&err);
                                         },
                                         (Err(err), Ok(_)) => {
-                                            web_sys::console::log_1(&"Directory Error".into());
+                                            let IoError::ReadError(err) = err;
+                                            web_sys::console::log_1(&err);
                                         },
                                         (Err(err_1), Err(err_2)) => {
-                                            web_sys::console::log_1(&"Both Error".into());
+                                            let IoError::ReadError(err_1) = err_1;
+                                            let IoError::ReadError(err_2) = err_2;
+                                            web_sys::console::log_1(&err_1);
+                                            web_sys::console::log_1(&err_2);
                                         },
                                     };
                                 }

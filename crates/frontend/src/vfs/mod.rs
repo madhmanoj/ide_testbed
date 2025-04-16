@@ -8,7 +8,7 @@ use js_sys::{ArrayBuffer, Uint8Array};
 use util::StreamTools;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{DomException, FileSystemHandle};
+use web_sys::FileSystemHandle;
 
 #[derive(Clone)]
 pub struct File {
@@ -18,12 +18,9 @@ pub struct File {
 }
 
 impl File {
-    // TODO there are several things that can go wrong here (e.g., 
-    // insufficient permissions, timeouts. etc). If any of these fails the
-    // whole drop operation should probably be cancelled and a error message
-    // somehow displayed to the user
-    pub async fn from_handle(file: &web_sys::FileSystemFileHandle) -> Result<File, JsValue> {
-        match JsFuture::from(file.get_file()).await {
+    pub async fn from_handle(file: &web_sys::FileSystemFileHandle) -> Result<File, IoError> {
+        let file = JsFuture::from(file.get_file()).await.map_err(IoError::ReadError);
+        match file {
             Ok(file) => {
                 let file = file.unchecked_into::<web_sys::File>();
                 let reader = web_sys::FileReader::new().unwrap();
@@ -38,7 +35,8 @@ impl File {
                 reader.set_onerror(Some(onerror.as_ref().unchecked_ref()));
                 tracing::info!("reading file {}", file.name());
                 reader.read_as_array_buffer(&file).unwrap();
-                match rx.select_next_some().await {
+                let received = rx.select_next_some().await.map_err(|err| IoError::ReadError(err.into()));
+                match received {
                     Ok(buffer) => {
                         tracing::info!("reading file {} done", file.name());
                         let buffer = buffer.unchecked_into::<ArrayBuffer>();
@@ -49,7 +47,7 @@ impl File {
                         })
                     }, 
                     Err(err) => {
-                        Err(err.into())
+                        Err(err)
                     }
                 }
             }
@@ -67,7 +65,9 @@ pub struct Directory {
 }
 
 impl Directory {
-    pub async fn from_handle(directory: &web_sys::FileSystemDirectoryHandle) -> Result<Directory, JsValue> {
+    // this is just to suppress clippy warnings on the line we return the files and directories
+    #[allow(clippy::type_complexity)]
+    pub async fn from_handle(directory: &web_sys::FileSystemDirectoryHandle) -> Result<Directory, IoError> {
         let entries = directory.values();
         let handles = FuturesUnordered::new();
         while let Ok(entry) = entries.next() {
@@ -81,7 +81,7 @@ impl Directory {
                 handles.push(async { handle });
             }
         }
-        let (files, subdirectories): (Result<Vec<Rc<File>>, JsValue>, Result<Vec<Rc<Directory>>, JsValue>) = handles
+        let (files, subdirectories): (Result<Vec<Rc<File>>, IoError>, Result<Vec<Rc<Directory>>, IoError>) = handles
             .filter_map(|handle| async move {
                 match handle.kind() {
                     web_sys::FileSystemHandleKind::File =>
@@ -111,5 +111,4 @@ impl Directory {
 
 pub enum IoError {
     ReadError(JsValue),
-    FileReaderError(DomException)
 }

@@ -76,7 +76,7 @@ dependencies = [
 [[package]]
 name = "codemirror-sys"
 version = "0.1.0"
-source = "git+https://github.com/rustifybe/codemirror-sys.git#2978a16963cb33715ccd2bda1b8f2f9537a77b36"
+source = "git+https://github.com/rustifybe/codemirror-sys.git?branch=test#8af85dfc6da83659b40ba32582fe94c7b261289d"
 dependencies = [
  "js-sys",
  "wasm-bindgen",

@@ -16,7 +16,7 @@ strum_macros = "0.24"
 strum = { version = "0.24", features = ["derive"] }
 dominator = "0.5.33"
 either = "1.15.0"
-codemirror-sys = { git = "https://github.com/rustifybe/codemirror-sys.git" }
+codemirror-sys = { git = "https://github.com/rustifybe/codemirror-sys.git", branch = "test" }
 xterm-js-sys = { git = "https://github.com/madhmanoj/xterm-js-sys.git" }
 futures = "0.3.26"
 futures-signals = "0.3.31"
