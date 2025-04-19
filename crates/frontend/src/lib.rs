@@ -13,6 +13,7 @@ mod workspace;
 mod vfs;
 mod contextmenu;
 mod styles;
+mod errors;
 
 const RESIZER_PX: u32 = 3;
 
@@ -116,6 +117,7 @@ pub async fn main() {
     });
 
     dominator::append_dom(&dominator::body(), outer);
+    dominator::append_dom(&dominator::body(), errors::render());
 }
 
 const DEFAULT_FILE_MODE: u32 = 0o664;

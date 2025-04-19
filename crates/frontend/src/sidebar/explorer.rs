@@ -6,9 +6,9 @@ use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use futures_signals::{signal::{Mutable, Signal, SignalExt}, signal_vec::SignalVecExt};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{FileSystemDirectoryHandle, FileSystemFileHandle, FileSystemHandle, FileSystemHandleKind};
+use web_sys::{DomException, FileSystemDirectoryHandle, FileSystemFileHandle, FileSystemHandle, FileSystemHandleKind};
 
-use crate::{contextmenu::{ContextMenu, Target}, styles, vfs::{self, Directory, IoError}};
+use crate::{contextmenu::{ContextMenu, Target}, errors::{self, Notification, NotificationType}, styles, vfs::{self, Directory, IoError}};
 
 const ICON_SVG_PATH: &str =
     "M16 0H8C6.9 0 6 .9 6 2V18C6 19.1 6.9 20 8 20H20C21.1 20 22 19.1 22 \
@@ -325,7 +325,12 @@ impl Explorer {
                                         // temporary solution till we implement the overlay to show the UI
                                         (Ok(_), Err(err)) => {
                                             let IoError::ReadError(err) = err;
-                                            web_sys::console::log_1(&err);
+                                            let err = err.dyn_into::<DomException>().ok().unwrap();
+                                            errors::append_notification(Notification { 
+                                                title: err.name(), 
+                                                description: err.message(), 
+                                                message_type: NotificationType::Error 
+                                            });
                                         },
                                         (Err(err), Ok(_)) => {
                                             let IoError::ReadError(err) = err;

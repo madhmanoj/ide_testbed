@@ -5,7 +5,6 @@ use web_sys::{HtmlElement, HtmlInputElement, SvgElement};
 pub mod menu;
 pub mod tab;
 pub mod panel;
-pub mod console;
 pub mod contextmenu;
 pub mod vfs_item;
 
