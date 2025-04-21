@@ -26,34 +26,42 @@ pub fn render() -> Dom {
         .style("position", "absolute")
         .style("right", "10px")
         .style("bottom", "0px")
-        .style("gap", "5px")
         .children_signal_vec(NOTIFICATIONS.with(|vec| {
             vec.signal_vec_cloned().map(|notification| {
                 match notification.message_type {
                     NotificationType::Info => html!("div", {
                         .style("background-color", "blue")
+                        .class("mb-2")
                         .child(html!("div", {
+                            .class("m-2")
                             .text(&notification.title)
                         }))
                         .child(html!("div", {
+                            .class("m-2")
                             .text(&notification.description)
                         }))
                     }),
                     NotificationType::Warn => html!("div", {
                         .style("background-color", "yellow")
+                        .class("mb-2")
                         .child(html!("div", {
+                            .class("m-2")
                             .text(&notification.title)
                         }))
                         .child(html!("div", {
+                            .class("m-2")
                             .text(&notification.description)
                         }))
                     }),
                     NotificationType::Error => html!("div", {
                         .style("background-color", "red")
+                        .class("mb-2")
                         .child(html!("div", {
+                            .class("m-2")
                             .text(&notification.title)
                         }))
                         .child(html!("div", {
+                            .class("m-2")
                             .text(&notification.description)
                         }))
                     }),
