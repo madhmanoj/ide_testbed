@@ -102,7 +102,7 @@ impl Console {
                 terminal.open(&el);
                 fit.fit();
                 for i in 0..=30 {
-                    terminal.write(&format!("HELLO{}\r\n", i));
+                    terminal.write(&format!("HELLO{i}\r\n"));
                 }
             })
         })

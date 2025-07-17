@@ -113,7 +113,7 @@ impl Editor {
                         }
                     },
                     Err(err) => {
-                        panic!("Not valid Unicode: {}", err);
+                        panic!("Not valid Unicode: {err}");
                     },
                 }
                 async {}

@@ -10,7 +10,7 @@ pub mod vfs_item;
 
 pub const BACKGROUND_COLOR: &str = "#f3f3f3"; // lightgray
 pub const FEATURE_COLOR: &str = "#007acc"; // blue
-const FOREGROUND_COLOR: &str = "#ffffff"; // TOGGLE_ACTIVE_COLOR -- white
+pub const FOREGROUND_COLOR: &str = "#ffffff"; // TOGGLE_ACTIVE_COLOR -- white
 const TITLE_COLOR: &str = "#828282"; // TOGGLE_INACTIVE_COLOR -- darkgray
 const TEXT_COLOR: &str = "#2c2c2c"; // mineshaft
 
@@ -24,7 +24,7 @@ pub fn input(dom_builder: DomBuilder<HtmlInputElement>) -> DomBuilder<HtmlInputE
     dom_builder
         .class("w-full")
         .class("focus:outline-none")
-        .style("border", format!("2px solid {}", FEATURE_COLOR))
+        .style("border", format!("2px solid {FEATURE_COLOR}"))
         .style("box-shadow", "none")
 }
 
