@@ -31,8 +31,10 @@ impl Search {
 
     pub fn render(&self) -> dominator::Dom {
         html!("div", {
+            .class("block")
             .apply(styles::panel::body)
             .child(html!("div", {
+                .class("h-[35px]")
                 .apply(styles::panel::title)
                 .child(html!("span", {
                     .apply(styles::panel::title_text)

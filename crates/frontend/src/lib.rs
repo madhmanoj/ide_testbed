@@ -1,23 +1,40 @@
 use std::{rc::Rc, sync::Arc};
 
-use dominator::html;
-use futures::channel::mpsc;
-use futures_signals::{map_ref, signal::SignalExt, signal_vec::MutableVec};
+use dominator::{clone, html};
+use futures::{channel::mpsc, StreamExt};
+use futures_signals::{map_ref, signal::SignalExt, signal_vec::{MutableVec, SignalVecExt}};
 use once_cell::sync::Lazy;
 use tracing_subscriber::{prelude::*, EnvFilter};
 use wasm_bindgen::prelude::*;
+use workspace::activity_panel::{ActivityPanel, ActivityPanelCommand};
 
 mod sidebar;
 mod workspace;
 mod vfs;
 mod contextmenu;
 mod styles;
+mod errors;
+
+const RESIZER_PX: u32 = 3;
+
+
+#[derive(Clone)]
+pub enum GridPanel {
+    Panel(Rc<ActivityPanel>),
+    Resizer
+}
+
+#[derive(Clone)]
+pub enum ColumnType {
+    Auto,
+    Fr
+}
 
 enum WorkspaceCommand {
     OpenFile(Rc<vfs::File>),
 }
 type WorkspaceCommandSender = mpsc::UnboundedSender<WorkspaceCommand>;
-type WorkspaceCommandReceiver = mpsc::UnboundedReceiver<WorkspaceCommand>;
+// type WorkspaceCommandReceiver = mpsc::UnboundedReceiver<WorkspaceCommand>;
 
 #[wasm_bindgen(start)]
 pub async fn main() {
@@ -46,16 +63,61 @@ pub async fn main() {
 
     let workspace_width = map_ref!(window_width, sidebar_width => {
         window_width.saturating_sub(*sidebar_width)
-    });
+    }).broadcast();
+
+    let console_height = workspace.console_height.signal();
+    let activity_panel_height = 
+        map_ref!(window_height, console_height => window_height.saturating_sub(console_height + RESIZER_PX));
+
+    // signal resetting div layout based on sidebar resizing
+    let global_cols = MutableVec::new_with_values(vec![
+        ColumnType::Auto,
+        ColumnType::Auto,
+        ColumnType::Auto,
+        ColumnType::Fr
+    ]);
 
     let outer = html!("div", {
-        .apply(styles::default_layout)
-        .class("grid-cols-[auto_1fr]")
-        .child(Sidebar::render(&sidebar, &workspace_command_tx))
-        .child(Workspace::render(&workspace, workspace_command_rx, workspace_width, window_height))
+        .future(workspace_command_rx.for_each(clone!(workspace => move |command| clone!(workspace => async move {
+            match command {
+                WorkspaceCommand::OpenFile(file) => {
+                    let activity_panel = workspace.active_panel.get_cloned();
+                    let activity_panel_tx = activity_panel.activity_panel_tx.get_cloned();
+
+                    if let Some(activity_panel_tx) = activity_panel_tx {
+                        activity_panel_tx
+                            .unbounded_send(ActivityPanelCommand::OpenFile(file.clone()))
+                            .unwrap();   
+                    }
+                }
+            }            
+        }))))
+        .class("grid")
+        .style_signal("grid-template-columns", global_cols.signal_vec_cloned()
+            .map(|col_type| match col_type {
+                ColumnType::Auto => "auto".to_string(),
+                ColumnType::Fr => "1fr".to_string()
+            })
+            .to_signal_cloned()
+            .map(|columns| columns.join(" "))
+        )
+        .class("grid-rows-[1fr_auto_auto]")
+
+        .child(Sidebar::render_menu(&sidebar, global_cols.clone()))
+
+        .child_signal(Sidebar::render_panel(&sidebar, &workspace_command_tx))
+
+        .child_signal(Sidebar::render_vertical_resizer(&sidebar, global_cols.clone()))
+
+        .child(Workspace::render_activity_panel(&workspace, workspace_width.signal(), activity_panel_height))
+
+        .child(Workspace::render_horizontal_resizer(&workspace))
+
+        .child(Workspace::render_console(&workspace, workspace_width.signal()))
     });
 
     dominator::append_dom(&dominator::body(), outer);
+    dominator::append_dom(&dominator::body(), errors::render());
 }
 
 const DEFAULT_FILE_MODE: u32 = 0o664;

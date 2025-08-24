@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "frontend"
-]
+, "util"]
 
 default-members = [
     "frontend"
